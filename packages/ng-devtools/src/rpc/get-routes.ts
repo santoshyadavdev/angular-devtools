@@ -61,19 +61,25 @@ function findRouteFiles(
       const content = readFileSync(full, 'utf-8')
       const relPath = relative(cwd, full)
 
-      for (const match of content.matchAll(/path:\s*['"`]([^'"`]*)['"`]/g)) {
-        const after = content.slice(match.index!)
-        const componentMatch = after.match(/(?:component|loadComponent).*?(\w+)/)
-        const hasChildren = /children\s*:\s*\[/.test(after.slice(0, 200))
+      const pathMatches = [...content.matchAll(/path:\s*['"`]([^'"`]*)['"`]/g)]
+      pathMatches.forEach((match, i) => {
+        const route = content.slice(match.index, pathMatches[i + 1]?.index ?? content.length)
         routes.push({
           path: match[1],
-          component: componentMatch?.[1],
-          hasChildren,
+          component: routeComponent(route),
+          hasChildren: /children\s*:\s*\[/.test(route),
           file: relPath,
         })
-      }
+      })
     } catch {
       // skip unreadable files
     }
   }
+}
+
+function routeComponent(route: string): string | undefined {
+  const eager = route.match(/\bcomponent\s*:\s*(\w+)/)
+  if (eager) return eager[1]
+  const lazy = route.match(/loadComponent\s*:[\s\S]*?\.then\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.(\w+)/)
+  return lazy?.[2]
 }
