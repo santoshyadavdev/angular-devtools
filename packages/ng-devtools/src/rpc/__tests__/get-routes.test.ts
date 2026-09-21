@@ -49,6 +49,35 @@ describe('get-routes', () => {
     expect(routes.map(r => r.component)).toEqual([undefined, 'AboutComponent'])
   })
 
+  it('reads the component whatever the property order', async () => {
+    const routes = await routesFor(`[
+      { component: HomeComponent, path: 'home' },
+      { path: 'admin', children: [{ component: UsersComponent, path: 'users' }] },
+    ]`)
+    expect(routes.map(r => [r.path, r.component])).toEqual([
+      ['home', 'HomeComponent'],
+      ['admin', undefined],
+      ['users', 'UsersComponent'],
+    ])
+  })
+
+  it('only reads the lazy component from loadComponent', async () => {
+    const routes = await routesFor(`[{
+      path: 'lazy',
+      loadComponent: () => import('./lazy'),
+      resolve: { data: () => import('./data').then(m => m.Data) },
+    }]`)
+    expect(routes.map(r => r.component)).toEqual([undefined])
+  })
+
+  it('ignores braces and paths inside strings and comments', async () => {
+    const routes = await routesFor(`[
+      // { path: 'commented', component: Nope },
+      { path: 'about', title: 'About {us}', component: AboutComponent },
+    ]`)
+    expect(routes.map(r => [r.path, r.component])).toEqual([['about', 'AboutComponent']])
+  })
+
   it('only flags children on the route that has them', async () => {
     const routes = await routesFor(`[
       { path: 'admin', component: Admin, children: [{ path: 'users', component: Users }] },

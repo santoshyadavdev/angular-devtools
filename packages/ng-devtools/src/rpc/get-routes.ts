@@ -61,25 +61,74 @@ function findRouteFiles(
       const content = readFileSync(full, 'utf-8')
       const relPath = relative(cwd, full)
 
-      const pathMatches = [...content.matchAll(/path:\s*['"`]([^'"`]*)['"`]/g)]
-      pathMatches.forEach((match, i) => {
-        const route = content.slice(match.index, pathMatches[i + 1]?.index ?? content.length)
+      for (const body of objectLiterals(content)) {
+        const props = topLevelProps(body)
+        const path = props.get('path')?.match(/^['"`]([^'"`]*)['"`]$/)?.[1]
+        if (path === undefined) continue
         routes.push({
-          path: match[1],
-          component: routeComponent(route),
-          hasChildren: /children\s*:\s*\[/.test(route),
+          path,
+          component: routeComponent(props),
+          hasChildren: props.has('children'),
           file: relPath,
         })
-      })
+      }
     } catch {
       // skip unreadable files
     }
   }
 }
 
-function routeComponent(route: string): string | undefined {
-  const eager = route.match(/\bcomponent\s*:\s*(\w+)/)
-  if (eager) return eager[1]
-  const lazy = route.match(/loadComponent\s*:[\s\S]*?\.then\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.(\w+)/)
-  return lazy?.[2]
+function routeComponent(props: Map<string, string>): string | undefined {
+  const eager = props.get('component')?.match(/^(\w+)/)?.[1]
+  if (eager) return eager
+  return props.get('loadComponent')?.match(/\.then\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.(\w+)/)?.[2]
+}
+
+function objectLiterals(source: string): string[] {
+  const spans: [number, number][] = []
+  const open: number[] = []
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (ch === '"' || ch === "'" || ch === '`') i = skipString(source, i)
+    else if (source.startsWith('//', i)) i = skipTo(source, '\n', i)
+    else if (source.startsWith('/*', i)) i = skipTo(source, '*/', i) + 1
+    else if (ch === '{') open.push(i)
+    else if (ch === '}' && open.length) spans.push([open.pop()!, i])
+  }
+  return spans.sort((a, b) => a[0] - b[0]).map(([start, end]) => source.slice(start + 1, end))
+}
+
+function topLevelProps(body: string): Map<string, string> {
+  const props = new Map<string, string>()
+  const add = (text: string) => {
+    const prop = text.match(/^\s*(\w+)\s*:\s*([\s\S]*?)\s*$/)
+    if (prop) props.set(prop[1], prop[2])
+  }
+  let depth = 0
+  let start = 0
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (ch === '"' || ch === "'" || ch === '`') i = skipString(body, i)
+    else if ('([{'.includes(ch)) depth++
+    else if (')]}'.includes(ch)) depth--
+    else if (ch === ',' && depth === 0) {
+      add(body.slice(start, i))
+      start = i + 1
+    }
+  }
+  add(body.slice(start))
+  return props
+}
+
+function skipString(source: string, start: number): number {
+  for (let i = start + 1; i < source.length; i++) {
+    if (source[i] === '\\') i++
+    else if (source[i] === source[start]) return i
+  }
+  return source.length
+}
+
+function skipTo(source: string, marker: string, from: number): number {
+  const at = source.indexOf(marker, from + 2)
+  return at === -1 ? source.length : at
 }
