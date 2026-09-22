@@ -103,6 +103,55 @@ describe('get-routes', () => {
     expect(routes.map(r => [r.path, r.component])).toEqual([['home', 'HomeComponent']])
   })
 
+  it('does not treat objects in metadata arrays as routes', async () => {
+    const routes = await routesFor(`[
+      {
+        path: 'home',
+        component: HomeComponent,
+        data: { breadcrumbs: [{ path: 'label', component: Nope }] },
+      },
+    ]`)
+    expect(routes.map(r => [r.path, r.component])).toEqual([['home', 'HomeComponent']])
+  })
+
+  it('does not treat objects in a providers array as routes', async () => {
+    const routes = await routesFor(`[
+      {
+        path: 'home',
+        component: HomeComponent,
+        providers: [{ provide: CONFIG, useValue: { path: 'nope' } }],
+      },
+    ]`)
+    expect(routes.map(r => r.path)).toEqual(['home'])
+  })
+
+  it('reads routes nested in metadata below a children array', async () => {
+    const routes = await routesFor(`[
+      {
+        path: 'admin',
+        children: [
+          { path: 'users', component: Users, data: { tabs: [{ path: 'nope' }] } },
+        ],
+      },
+    ]`)
+    expect(routes.map(r => r.path)).toEqual(['admin', 'users'])
+  })
+
+  it('reads routes passed straight to provideRouter', async () => {
+    const routes = await routesFor(
+      `bootstrapApplication(App, { providers: [provideRouter([{ path: 'home', component: HomeComponent }])] })`,
+    )
+    expect(routes.map(r => [r.path, r.component])).toEqual([['home', 'HomeComponent']])
+  })
+
+  it('reads routes passed straight to RouterModule.forRoot', async () => {
+    const routes = await routesFor(
+      `@NgModule({ imports: [RouterModule.forRoot([{ path: 'home', component: HomeComponent }])] })
+      export class AppRoutingModule {}`,
+    )
+    expect(routes.map(r => [r.path, r.component])).toEqual([['home', 'HomeComponent']])
+  })
+
   it('only flags children on the route that has them', async () => {
     const routes = await routesFor(`[
       { path: 'admin', component: Admin, children: [{ path: 'users', component: Users }] },

@@ -84,16 +84,31 @@ function routeComponent(props: Map<string, string>): string | undefined {
   return props.get('loadComponent')?.match(/\.then\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.(\w+)/)?.[2]
 }
 
+type Bracket = { ch: string; at: number; routeArray: boolean; routeObject: boolean }
+
+// An array holds routes when it is the route configuration itself (a top-level
+// array, or one passed to provideRouter/forRoot/forChild) or a `children` array.
+// Any other array is metadata, so objects inside it are never routes.
+const ROUTE_ARRAY = /(?:\bchildren\s*:|\b(?:provideRouter|forRoot|forChild)\s*\()\s*$/
+
 function objectLiterals(source: string): string[] {
   const spans: [number, number][] = []
-  const open: { ch: string; at: number; inArray: boolean }[] = []
+  const open: Bracket[] = []
   for (let i = 0; i < source.length; i++) {
     const ch = source[i]
     if (ch === '"' || ch === "'" || ch === '`') i = skipString(source, i)
-    else if ('([{'.includes(ch)) open.push({ ch, at: i, inArray: open.at(-1)?.ch === '[' })
+    else if ('([{'.includes(ch)) {
+      const parent = open.at(-1)
+      open.push({
+        ch,
+        at: i,
+        routeArray: ch === '[' && (!parent || ROUTE_ARRAY.test(source.slice(Math.max(0, i - 64), i))),
+        routeObject: ch === '{' && parent?.ch === '[' && parent.routeArray,
+      })
+    }
     else if (')]}'.includes(ch)) {
       const closed = open.pop()
-      if (ch === '}' && closed?.ch === '{' && closed.inArray) spans.push([closed.at, i])
+      if (ch === '}' && closed?.routeObject) spans.push([closed.at, i])
     }
   }
   return spans.sort((a, b) => a[0] - b[0]).map(([start, end]) => source.slice(start + 1, end))
