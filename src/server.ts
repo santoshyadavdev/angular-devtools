@@ -14,7 +14,7 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-const isDev = process.env['NODE_ENV'] !== 'production';
+const isDev = process.env['NODE_ENV'] === 'development';
 const devtools = initDevframe(ngDevtools, { base: '/__ng-devtools/', ws: false, auth: !isDev });
 app.use(devtools.nodeMiddleware);
 

@@ -86,6 +86,7 @@ const NGRX_PATTERNS: { pattern: RegExp; kind: NgrxStoreEntry['kind'] }[] = [
   { pattern: /(?:export\s+)?const\s+(\w+)\s*=\s*signalStore\s*\(/g, kind: 'signal-store' },
   { pattern: /(?:export\s+)?const\s+(\w+)\s*=\s*signalState\s*[<(]/g, kind: 'signal-state' },
   { pattern: /export\s+const\s+(\w+)\s*=\s*signalMethod\s*[<(]/g, kind: 'signal-method' },
+  { pattern: /(\w+)\s*:\s*signalMethod\s*[<(]/g, kind: 'signal-method' },
 ];
 
 function scanNgrxStore(dir: string, cwd: string): NgrxStoreEntry[] {
