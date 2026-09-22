@@ -54,47 +54,51 @@ interface NgrxStoreEntry {
   detail?: string;
 }
 
-const NGRX_PATTERNS: { pattern: RegExp; kind: NgrxStoreEntry['kind']; extractDetail?: boolean }[] =
-  [
-    // Actions
-    { pattern: /export\s+const\s+(\w+)\s*=\s*createAction\s*\(/g, kind: 'action' },
-    { pattern: /(\w+)\s*=\s*createActionGroup\s*\(/g, kind: 'action', extractDetail: true },
+const NGRX_PATTERNS: { pattern: RegExp; kind: NgrxStoreEntry['kind'] }[] = [
+  // Actions
+  { pattern: /export\s+const\s+(\w+)\s*=\s*createAction\s*\(/g, kind: 'action' },
+  { pattern: /(\w+)\s*=\s*createActionGroup\s*\(/g, kind: 'action' },
 
-    // Reducers
-    { pattern: /export\s+const\s+(\w+)\s*=\s*createReducer\s*\(/g, kind: 'reducer' },
+  // Reducers
+  { pattern: /export\s+const\s+(\w+)\s*=\s*createReducer\s*\(/g, kind: 'reducer' },
 
-    // Effects
-    { pattern: /(\w+)\s*=\s*createEffect\s*\(/g, kind: 'effect' },
+  // Effects
+  { pattern: /([\w$]+)\s*=\s*createEffect\s*\(/g, kind: 'effect' },
 
-    // Selectors
-    { pattern: /export\s+const\s+(\w+)\s*=\s*createSelector\s*\(/g, kind: 'selector' },
-    {
-      pattern: /export\s+const\s+(\w+)\s*=\s*createFeatureSelector\s*[<(]/g,
-      kind: 'selector',
-    },
+  // Selectors
+  { pattern: /export\s+const\s+(\w+)\s*=\s*createSelector\s*\(/g, kind: 'selector' },
+  {
+    pattern: /export\s+const\s+(\w+)\s*=\s*createFeatureSelector\s*[<(]/g,
+    kind: 'selector',
+  },
 
-    // Features (createFeature)
-    { pattern: /export\s+const\s+(\w+)\s*=\s*createFeature\s*\(/g, kind: 'feature' },
+  // Features (createFeature)
+  { pattern: /export\s+const\s+(\w+)\s*=\s*createFeature\s*\(/g, kind: 'feature' },
 
-    // Store setup
-    { pattern: /(provideStore)\s*\(/g, kind: 'store-setup' },
-    { pattern: /(provideState)\s*\(/g, kind: 'store-setup' },
-    { pattern: /(provideEffects)\s*\(/g, kind: 'store-setup' },
-    { pattern: /StoreModule\.(forRoot|forFeature)\s*\(/g, kind: 'store-setup' },
-    { pattern: /EffectsModule\.(forRoot|forFeature)\s*\(/g, kind: 'store-setup' },
+  // Store setup
+  { pattern: /(provideStore)\s*\(/g, kind: 'store-setup' },
+  { pattern: /(provideState)\s*\(/g, kind: 'store-setup' },
+  { pattern: /(provideEffects)\s*\(/g, kind: 'store-setup' },
+  { pattern: /StoreModule\.(forRoot|forFeature)\s*\(/g, kind: 'store-setup' },
+  { pattern: /EffectsModule\.(forRoot|forFeature)\s*\(/g, kind: 'store-setup' },
 
-    // NgRx Signals
-    { pattern: /export\s+const\s+(\w+)\s*=\s*signalStore\s*\(/g, kind: 'signal-store' },
-    { pattern: /const\s+(\w+)\s*=\s*signalStore\s*\(/g, kind: 'signal-store' },
-    { pattern: /export\s+const\s+(\w+)\s*=\s*signalState\s*[<(]/g, kind: 'signal-state' },
-    { pattern: /const\s+(\w+)\s*=\s*signalState\s*[<(]/g, kind: 'signal-state' },
-    { pattern: /export\s+const\s+(\w+)\s*=\s*signalMethod\s*[<(]/g, kind: 'signal-method' },
-  ];
+  // NgRx Signals
+  { pattern: /(?:export\s+)?const\s+(\w+)\s*=\s*signalStore\s*\(/g, kind: 'signal-store' },
+  { pattern: /(?:export\s+)?const\s+(\w+)\s*=\s*signalState\s*[<(]/g, kind: 'signal-state' },
+  { pattern: /export\s+const\s+(\w+)\s*=\s*signalMethod\s*[<(]/g, kind: 'signal-method' },
+];
 
 function scanNgrxStore(dir: string, cwd: string): NgrxStoreEntry[] {
   const entries: NgrxStoreEntry[] = [];
   walk(dir, cwd, entries);
-  return entries;
+  // Deduplicate by name+file+line (guards against overlapping patterns)
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    const key = `${e.name}:${e.file}:${e.line}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function walk(dir: string, cwd: string, out: NgrxStoreEntry[]) {

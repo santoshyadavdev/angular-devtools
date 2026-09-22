@@ -277,6 +277,10 @@ export class ComponentTree {
       ]);
       this.components.set(comps);
       this.allProviders.set(providers);
+      const sel = this.selected();
+      if (sel) {
+        this.selectedProviders.set(providers.filter((p) => p.file === sel.file));
+      }
     } finally {
       this.loading.set(false);
     }

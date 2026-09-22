@@ -14,9 +14,8 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-// Mount the devframe handler — serves the devtools UI, RPC, and MCP at /__ng-devtools/
-// ws:false because ng serve doesn't proxy WS upgrades; auth:false for dev access
-const devtools = initDevframe(ngDevtools, { base: '/__ng-devtools/', ws: false, auth: false });
+const isDev = process.env['NODE_ENV'] !== 'production';
+const devtools = initDevframe(ngDevtools, { base: '/__ng-devtools/', ws: false, auth: !isDev });
 app.use(devtools.nodeMiddleware);
 
 /**

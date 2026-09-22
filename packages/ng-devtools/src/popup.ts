@@ -228,20 +228,23 @@ export function createDevtoolsPopup() {
     e.preventDefault();
   });
 
-  window.addEventListener('mousemove', (e) => {
+  const onMouseMove = (e: MouseEvent) => {
     if (!dragging) return;
     state.x = Math.max(0, e.clientX - dragOffsetX);
     state.y = Math.max(0, e.clientY - dragOffsetY);
     panel.style.left = state.x + 'px';
     panel.style.top = state.y + 'px';
-  });
+  };
 
-  window.addEventListener('mouseup', () => {
+  const onMouseUp = () => {
     if (dragging) {
       dragging = false;
       saveState(state);
     }
-  });
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
 
   function applyDock() {
     panel.className = `panel${isOpen ? ' open' : ''} dock-${state.docked}`;
@@ -287,6 +290,9 @@ export function createDevtoolsPopup() {
   return {
     toggle: togglePanel,
     destroy: () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      resizeObserver.disconnect();
       popupRoot?.remove();
       popupRoot = null;
       isOpen = false;

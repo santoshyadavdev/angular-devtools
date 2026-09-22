@@ -445,15 +445,14 @@ function getNgrxStoreState(): unknown | undefined {
         if (tokenName === 'Store') {
           try {
             const store = injector.get(token);
-            // NgRx Store keeps current state accessible via its internal state
-            // Use a synchronous snapshot via getValue() on the underlying BehaviorSubject
-            if (store && typeof store.getValue === 'function') {
-              return safeSerialize(store.getValue());
-            }
-            // Alternative: check for the internal state property
-            if (store?._state?.getValue) {
-              return safeSerialize(store._state.getValue());
-            }
+            if (!store || typeof store.subscribe !== 'function') continue;
+            // Subscribe once to capture the synchronous initial emission
+            let snapshot: unknown;
+            const sub = store.subscribe((val: unknown) => {
+              snapshot = val;
+            });
+            sub.unsubscribe();
+            if (snapshot !== undefined) return safeSerialize(snapshot);
           } catch {
             // not resolvable at this injector level
           }
@@ -508,13 +507,17 @@ function subscribeToReduxDevTools() {
   if (typeof ext.subscribe === 'function') {
     try {
       ext.subscribe((message: any) => {
-        if (message.type === 'ACTION' || message.type === 'DISPATCH') {
-          captureAction(message.payload);
-        }
-        if (message.state) {
-          win.__NGRX_DEVTOOLS_LAST_STATE__ = safeSerialize(
-            typeof message.state === 'string' ? JSON.parse(message.state) : message.state,
-          );
+        try {
+          if (message?.type === 'ACTION' || message?.type === 'DISPATCH') {
+            captureAction(message.payload);
+          }
+          if (message?.state) {
+            win.__NGRX_DEVTOOLS_LAST_STATE__ = safeSerialize(
+              typeof message.state === 'string' ? JSON.parse(message.state) : message.state,
+            );
+          }
+        } catch {
+          // ignore malformed messages
         }
       });
     } catch {
@@ -548,5 +551,5 @@ function safeSerialize(val: unknown): unknown {
 // Auto-init when loaded as a script
 if (typeof document !== 'undefined') {
   initOverlay().catch(console.error);
-  import('./popup.ts').then((m) => m.createDevtoolsPopup()).catch(() => {});
+  import('./popup.ts').then((m) => m.createDevtoolsPopup()).catch(console.error);
 }

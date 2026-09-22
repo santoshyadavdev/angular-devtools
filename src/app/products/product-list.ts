@@ -17,7 +17,10 @@ import { CurrencyPipe } from '@angular/common';
           [value]="store.filter.query()"
           (input)="store.updateFilter($any($event.target).value)"
         />
-        <select (change)="store.filterByCategory($any($event.target).value)">
+        <select
+          [value]="store.filter.category()"
+          (change)="store.filterByCategory($any($event.target).value)"
+        >
           <option value="">All Categories</option>
           @for (cat of store.categories(); track cat) {
             <option [value]="cat">{{ cat }}</option>

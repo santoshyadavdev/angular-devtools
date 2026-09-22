@@ -6,7 +6,7 @@ import { getBuildMeta } from './rpc/build-meta.ts';
 import { getSignals } from './rpc/get-signals.ts';
 import { getProviders } from './rpc/get-providers.ts';
 import { getNgrxStore } from './rpc/get-ngrx-store.ts';
-import type {} from './types.ts';
+import type { NgrxRuntimeAction } from './types.ts';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -68,7 +68,7 @@ const ngDevtools = defineDevframe({
     const ngrxStoreState = await my.rpc.sharedState('ngrx-store', {
       initialValue: {
         state: null as unknown,
-        actions: [] as { type: string; payload?: unknown; timestamp: number }[],
+        actions: [] as NgrxRuntimeAction[],
         connected: false,
       },
     });
@@ -121,10 +121,10 @@ const ngDevtools = defineDevframe({
       name: 'push-ngrx-state',
       type: 'action',
       jsonSerializable: true,
-      handler: (data: { state: unknown; actions: unknown[]; connected: boolean }) => {
+      handler: (data: { state: unknown; actions: NgrxRuntimeAction[]; connected: boolean }) => {
         ngrxStoreState.mutate((draft) => {
           draft.state = data.state;
-          draft.actions = data.actions as any;
+          draft.actions = data.actions;
           draft.connected = data.connected;
         });
       },

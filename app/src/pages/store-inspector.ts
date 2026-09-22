@@ -135,7 +135,7 @@ const KIND_COLORS: Record<string, string> = {
               <span class="action-count">{{ filteredActions().length }}</span>
             </h3>
             <div class="action-list">
-              @for (action of filteredActions(); track action.timestamp) {
+              @for (action of filteredActions(); track $index) {
                 <div
                   class="action-card"
                   [class.selected]="selectedAction() === action"
@@ -451,11 +451,13 @@ export class StoreInspector {
       if (!client) return;
       const my = client.scope('ng-devtools');
 
-      my.rpc.call('get-ngrx-store').then((entries: NgrxStoreEntry[]) => {
-        this.sourceEntries.set(entries);
-        // If source has entries, default to source mode; otherwise try runtime
-        if (entries.length === 0) this.mode.set('runtime');
-      });
+      my.rpc
+        .call('get-ngrx-store')
+        .then((entries: NgrxStoreEntry[]) => {
+          this.sourceEntries.set(entries);
+          if (entries.length === 0) this.mode.set('runtime');
+        })
+        .catch(() => this.sourceEntries.set([]));
 
       // Subscribe to runtime state
       my.rpc.sharedState('ngrx-store').then((state: any) => {

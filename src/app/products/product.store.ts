@@ -46,8 +46,8 @@ export const ProductStore = signalStore(
   })),
   withMethods((store) => ({
     loadProducts(): void {
+      if (store.isLoading()) return;
       patchState(store, { isLoading: true });
-      // Simulate async load
       setTimeout(() => {
         patchState(store, { products: MOCK_PRODUCTS, isLoading: false });
       }, 300);
