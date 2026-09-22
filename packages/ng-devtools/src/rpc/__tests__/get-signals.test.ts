@@ -187,6 +187,19 @@ describe('get-signals', () => {
     expect(signals.map((s) => [s.name, s.component])).toEqual([['value', 'app-panel']]);
   });
 
+  it('ignores a selector key written inside a template', async () => {
+    const signals = await signalsFor(
+      '@Component({\n' +
+        "  template: `<pre>selector: 'fake'</pre>`,\n" +
+        "  selector: 'app-real',\n" +
+        '})\n' +
+        'export class Docs {\n' +
+        '  shown = signal(true)\n' +
+        '}\n',
+    );
+    expect(signals.map((s) => [s.name, s.component])).toEqual([['shown', 'app-real']]);
+  });
+
   it('ignores declarations in comments', async () => {
     const signals = await signalsFor(`
       class Counter {

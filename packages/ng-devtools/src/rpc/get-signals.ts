@@ -179,16 +179,20 @@ function classBodyStart(code: string, from: number): number {
 
 /**
  * The selector of the last `@Component`/`@Directive` decorator in `code`, read
- * out of `source` at the same offsets. The decorator is located in the masked
- * copy so that one written inside a template cannot be picked up, and the
- * selector is read from the unmasked copy, where its value survives.
+ * out of `source` at the same offsets. Both the decorator and the `selector`
+ * key are found in the masked copy, so neither a decorator nor a `selector:`
+ * written inside a template can be picked up, and only the value is read from
+ * the unmasked copy, where it survives.
  */
 function decoratorSelector(code: string, source: string): string | undefined {
   let open = -1;
   for (const match of code.matchAll(DECORATOR)) open = match.index + match[0].length - 1;
   if (open === -1) return undefined;
-  const args = source.slice(open, matchDelimiter(code, open, '(', ')'));
-  return args.match(/selector:\s*['"`]([^'"`]+)['"`]/)?.[1];
+  const args = code.slice(open, matchDelimiter(code, open, '(', ')'));
+  const key = /selector:\s*['"`]/.exec(args);
+  if (!key) return undefined;
+  const quote = open + key.index + key[0].length - 1;
+  return source.slice(quote + 1, skipString(source, quote));
 }
 
 function matchDelimiter(source: string, open: number, start: string, end: string): number {
