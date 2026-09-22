@@ -78,6 +78,24 @@ describe('get-routes', () => {
     expect(routes.map(r => [r.path, r.component])).toEqual([['about', 'AboutComponent']])
   })
 
+  it('reads routes that contain comments', async () => {
+    const routes = await routesFor(`[
+      {
+        // landing page
+        path: 'home',
+        component: HomeComponent,
+      },
+      {
+        path: 'shop',
+        /* lazy (see [docs]) */ loadComponent: () => import('./shop').then(m => m.Shop),
+      },
+    ]`)
+    expect(routes.map(r => [r.path, r.component])).toEqual([
+      ['home', 'HomeComponent'],
+      ['shop', 'Shop'],
+    ])
+  })
+
   it('only flags children on the route that has them', async () => {
     const routes = await routesFor(`[
       { path: 'admin', component: Admin, children: [{ path: 'users', component: Users }] },

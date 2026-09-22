@@ -61,7 +61,7 @@ function findRouteFiles(
       const content = readFileSync(full, 'utf-8')
       const relPath = relative(cwd, full)
 
-      for (const body of objectLiterals(content)) {
+      for (const body of objectLiterals(stripComments(content))) {
         const props = topLevelProps(body)
         const path = props.get('path')?.match(/^['"`]([^'"`]*)['"`]$/)?.[1]
         if (path === undefined) continue
@@ -90,8 +90,6 @@ function objectLiterals(source: string): string[] {
   for (let i = 0; i < source.length; i++) {
     const ch = source[i]
     if (ch === '"' || ch === "'" || ch === '`') i = skipString(source, i)
-    else if (source.startsWith('//', i)) i = skipTo(source, '\n', i)
-    else if (source.startsWith('/*', i)) i = skipTo(source, '*/', i) + 1
     else if (ch === '{') open.push(i)
     else if (ch === '}' && open.length) spans.push([open.pop()!, i])
   }
@@ -128,7 +126,27 @@ function skipString(source: string, start: number): number {
   return source.length
 }
 
-function skipTo(source: string, marker: string, from: number): number {
-  const at = source.indexOf(marker, from + 2)
-  return at === -1 ? source.length : at
+function stripComments(source: string): string {
+  let out = ''
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const end = skipString(source, i)
+      out += source.slice(i, end + 1)
+      i = end
+    }
+    else if (source.startsWith('//', i)) {
+      const end = source.indexOf('\n', i)
+      i = (end === -1 ? source.length : end) - 1
+    }
+    else if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2)
+      i = end === -1 ? source.length : end + 1
+      out += ' '
+    }
+    else {
+      out += ch
+    }
+  }
+  return out
 }
