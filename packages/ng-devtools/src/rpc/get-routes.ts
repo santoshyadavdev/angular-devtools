@@ -1,7 +1,8 @@
 import { defineRpcFunction } from 'devframe';
 import * as v from 'valibot';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { skipString, stripComments } from './source-scan.ts';
 
 const RouteSchema = v.object({
   path: v.string(),
@@ -134,34 +135,4 @@ function topLevelProps(body: string): Map<string, string> {
   }
   add(body.slice(start));
   return props;
-}
-
-function skipString(source: string, start: number): number {
-  for (let i = start + 1; i < source.length; i++) {
-    if (source[i] === '\\') i++;
-    else if (source[i] === source[start]) return i;
-  }
-  return source.length;
-}
-
-function stripComments(source: string): string {
-  let out = '';
-  for (let i = 0; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
-      const end = skipString(source, i);
-      out += source.slice(i, end + 1);
-      i = end;
-    } else if (source.startsWith('//', i)) {
-      const end = source.indexOf('\n', i);
-      i = (end === -1 ? source.length : end) - 1;
-    } else if (source.startsWith('/*', i)) {
-      const end = source.indexOf('*/', i + 2);
-      i = end === -1 ? source.length : end + 1;
-      out += ' ';
-    } else {
-      out += ch;
-    }
-  }
-  return out;
 }

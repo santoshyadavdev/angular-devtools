@@ -1,0 +1,145 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getSignals } from '../get-signals.ts';
+
+let dir: string;
+
+afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+async function signalsFor(source: string) {
+  dir = mkdtempSync(join(tmpdir(), 'ng-devtools-signals-'));
+  mkdirSync(join(dir, 'src'));
+  writeFileSync(join(dir, 'src', 'app.ts'), source);
+  const { handler } = getSignals.setup({ cwd: dir } as never);
+  return handler();
+}
+
+describe('get-signals', () => {
+  it('reads the kind of each declaration', async () => {
+    const signals = await signalsFor(`
+      class Counter {
+        count = signal(0)
+        double = computed(() => this.count() * 2)
+        label = linkedSignal(() => '')
+        log = effect(() => {})
+        data = resource({ loader: () => Promise.resolve(1) })
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.kind])).toEqual([
+      ['count', 'signal'],
+      ['double', 'computed'],
+      ['label', 'linkedSignal'],
+      ['log', 'effect'],
+      ['data', 'resource'],
+    ]);
+  });
+
+  it('reports a required input once', async () => {
+    const signals = await signalsFor(`
+      class Profile {
+        name = input.required<string>()
+        nickname = input('')
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.kind])).toEqual([
+      ['name', 'input.required (signal)'],
+      ['nickname', 'input (signal)'],
+    ]);
+  });
+
+  it('reports a required query once', async () => {
+    const signals = await signalsFor(`
+      class Panel {
+        body = viewChild.required<ElementRef>('body')
+        rows = contentChildren(Row)
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.kind])).toEqual([
+      ['body', 'viewChild.required (signal)'],
+      ['rows', 'contentChildren (signal)'],
+    ]);
+  });
+
+  it('attributes each signal to the class that declares it', async () => {
+    const signals = await signalsFor(`
+      @Component({ selector: 'app-first' })
+      export class First {
+        a = signal(0)
+      }
+
+      @Component({ selector: 'app-second' })
+      export class Second {
+        b = signal(0)
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.component])).toEqual([
+      ['a', 'app-first'],
+      ['b', 'app-second'],
+    ]);
+  });
+
+  it('reads the selector of a directive', async () => {
+    const signals = await signalsFor(`
+      @Directive({ selector: '[appHighlight]' })
+      export class Highlight {
+        color = input('red')
+      }
+    `);
+    expect(signals[0].component).toBe('[appHighlight]');
+  });
+
+  it('reports no component for an undecorated class', async () => {
+    const signals = await signalsFor(`
+      @Component({ selector: 'app-first' })
+      export class First {
+        a = signal(0)
+      }
+
+      export class Store {
+        b = signal(0)
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.component])).toEqual([
+      ['a', 'app-first'],
+      ['b', undefined],
+    ]);
+  });
+
+  it('ignores declarations in comments', async () => {
+    const signals = await signalsFor(`
+      class Counter {
+        // count = signal(0)
+        /* stale = computed(() => 0) */
+        total = signal(0)
+      }
+    `);
+    expect(signals.map((s) => s.name)).toEqual(['total']);
+  });
+
+  it('ignores declarations quoted in a template', async () => {
+    const signals = await signalsFor(
+      '@Component({\n' +
+        "  selector: 'app-docs',\n" +
+        '  template: `<code>count = signal(0)</code>`,\n' +
+        '})\n' +
+        'export class Docs {\n' +
+        '  shown = signal(true)\n' +
+        '}\n',
+    );
+    expect(signals.map((s) => s.name)).toEqual(['shown']);
+  });
+
+  it('reports the line a declaration is on, past a block comment', async () => {
+    const signals = await signalsFor(
+      ['/**', ' * Counts things.', ' */', 'class Counter {', '  total = signal(0)', '}'].join('\n'),
+    );
+    expect(signals.map((s) => [s.name, s.line])).toEqual([['total', 5]]);
+  });
+
+  it('reports the file each declaration comes from', async () => {
+    const signals = await signalsFor(`class Counter { total = signal(0) }`);
+    expect(signals[0].file).toBe('src/app.ts');
+  });
+});
