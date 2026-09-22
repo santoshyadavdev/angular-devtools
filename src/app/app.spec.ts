@@ -21,6 +21,6 @@ describe('App', () => {
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     const hrefs = Array.from(compiled.querySelectorAll('nav a')).map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/', '/about']);
+    expect(hrefs).toEqual(['/', '/', '/products', '/about']);
   });
 });
