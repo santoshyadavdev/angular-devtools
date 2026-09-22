@@ -176,6 +176,17 @@ describe('get-signals', () => {
     expect(signals.map((s) => [s.name, s.component])).toEqual([['shown', 'app-docs']]);
   });
 
+  it('reads a selector past whitespace before the arguments', async () => {
+    const signals = await signalsFor(`
+      @Component
+      ({ selector: 'app-panel' })
+      export class Panel {
+        value = signal(0)
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.component])).toEqual([['value', 'app-panel']]);
+  });
+
   it('ignores declarations in comments', async () => {
     const signals = await signalsFor(`
       class Counter {

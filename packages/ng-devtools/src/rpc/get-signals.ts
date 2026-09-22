@@ -68,6 +68,9 @@ const SIGNAL_CALL = new RegExp(
   'g',
 );
 
+// A decorator may put whitespace, or a line break, before its arguments.
+const DECORATOR = /@(?:Component|Directive)\s*\(/g;
+
 function scanSignals(dir: string, cwd: string): SignalEntry[] {
   const entries: SignalEntry[] = [];
   walk(dir, cwd, entries);
@@ -181,9 +184,9 @@ function classBodyStart(code: string, from: number): number {
  * selector is read from the unmasked copy, where its value survives.
  */
 function decoratorSelector(code: string, source: string): string | undefined {
-  const at = Math.max(code.lastIndexOf('@Component('), code.lastIndexOf('@Directive('));
-  if (at === -1) return undefined;
-  const open = code.indexOf('(', at);
+  let open = -1;
+  for (const match of code.matchAll(DECORATOR)) open = match.index + match[0].length - 1;
+  if (open === -1) return undefined;
   const args = source.slice(open, matchDelimiter(code, open, '(', ')'));
   return args.match(/selector:\s*['"`]([^'"`]+)['"`]/)?.[1];
 }
