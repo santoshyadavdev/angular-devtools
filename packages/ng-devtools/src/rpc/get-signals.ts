@@ -189,7 +189,7 @@ function decoratorSelector(code: string, source: string): string | undefined {
   for (const match of code.matchAll(DECORATOR)) open = match.index + match[0].length - 1;
   if (open === -1) return undefined;
   const args = code.slice(open, matchDelimiter(code, open, '(', ')'));
-  const key = /selector:\s*['"`]/.exec(args);
+  const key = /\bselector\s*:\s*['"`]/.exec(args);
   if (!key) return undefined;
   const quote = open + key.index + key[0].length - 1;
   return source.slice(quote + 1, skipString(source, quote));
