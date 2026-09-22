@@ -59,9 +59,10 @@ const KINDS: Record<string, string> = {
 
 // One pass over the file: `name = fn(` or `name = fn.required(`, with the
 // optional `.required` part of the same match so a required input is not also
-// reported as a plain input.
+// reported as a plain input. The name may be a private field and may carry a
+// single line type annotation, as in `readonly total: Signal<number> =`.
 const SIGNAL_CALL = new RegExp(
-  String.raw`(\w+)\s*=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
+  String.raw`(#?[$\w]+)\s*(?::[^=;\n]+)?=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
   'g',
 );
 
@@ -102,9 +103,10 @@ function walk(dir: string, cwd: string, out: SignalEntry[]) {
 
 function signalsIn(content: string, relPath: string): SignalEntry[] {
   const source = stripComments(content);
-  const scopes = classScopes(source);
-  // A declaration quoted inside a template or a string is not code.
+  // A declaration quoted inside a template or a string is not code. Masking
+  // keeps the length, so offsets into the two strings stay interchangeable.
   const code = maskStrings(source);
+  const scopes = classScopes(code, source);
 
   const entries: SignalEntry[] = [];
   SIGNAL_CALL.lastIndex = 0;
@@ -129,15 +131,17 @@ function signalsIn(content: string, relPath: string): SignalEntry[] {
  * against the class that declares it rather than the first selector in the
  * file.
  */
-function classScopes(source: string): ClassScope[] {
+function classScopes(code: string, source: string): ClassScope[] {
   const scopes: ClassScope[] = [];
   const declaration = /\bclass\s+\w+/g;
   let previousEnd = 0;
   let match: RegExpExecArray | null;
-  while ((match = declaration.exec(source)) !== null) {
-    const bodyStart = source.indexOf('{', match.index + match[0].length);
+  // `code` has string contents masked out, so a class written inside a
+  // template cannot open a scope; `source` still holds the selector to read.
+  while ((match = declaration.exec(code)) !== null) {
+    const bodyStart = code.indexOf('{', match.index + match[0].length);
     if (bodyStart === -1) break;
-    const end = matchDelimiter(source, bodyStart, '{', '}');
+    const end = matchDelimiter(code, bodyStart, '{', '}');
     scopes.push({
       start: match.index,
       end,

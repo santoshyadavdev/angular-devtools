@@ -107,6 +107,40 @@ describe('get-signals', () => {
     ]);
   });
 
+  it('reads names that are not plain identifiers', async () => {
+    const signals = await signalsFor(`
+      class Counter {
+        count$ = signal(0)
+        #hidden = signal(0)
+        readonly total: WritableSignal<number> = signal(0)
+      }
+    `);
+    expect(signals.map((s) => s.name)).toEqual(['count$', '#hidden', 'total']);
+  });
+
+  it('does not open a class scope inside a template', async () => {
+    const signals = await signalsFor(
+      '@Component({\n' +
+        "  selector: 'app-docs',\n" +
+        '  template: `<pre>class Example {</pre>`,\n' +
+        '})\n' +
+        'export class Docs {\n' +
+        '  shown = signal(true)\n' +
+        '}\n' +
+        '\n' +
+        '@Component({\n' +
+        "  selector: 'app-next',\n" +
+        '})\n' +
+        'export class Next {\n' +
+        '  open = signal(false)\n' +
+        '}\n',
+    );
+    expect(signals.map((s) => [s.name, s.component])).toEqual([
+      ['shown', 'app-docs'],
+      ['open', 'app-next'],
+    ]);
+  });
+
   it('ignores declarations in comments', async () => {
     const signals = await signalsFor(`
       class Counter {
