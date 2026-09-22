@@ -21,14 +21,21 @@ export async function initOverlay() {
     if (tree.length) await my.rpc.call('push-injector-tree', tree);
   }
 
+  async function pushNgrxState() {
+    const data = collectNgrxState();
+    if (data) await my.rpc.call('push-ngrx-state', data);
+  }
+
   pushTree();
   pushSignalGraph();
   pushInjectorTree();
+  pushNgrxState();
 
   const interval = setInterval(() => {
     pushTree();
     pushSignalGraph();
     pushInjectorTree();
+    pushNgrxState();
   }, 3000);
 
   my.rpc.register({
@@ -380,7 +387,166 @@ function getProvidersForElement(el: Element) {
   }
 }
 
+// --- NgRx Store state collection via Redux DevTools protocol ---
+
+const ngrxActionLog: { type: string; payload?: unknown; timestamp: number }[] = [];
+const MAX_ACTION_LOG = 50;
+let reduxDevToolsSubscribed = false;
+
+function collectNgrxState(): {
+  state: unknown;
+  actions: { type: string; payload?: unknown; timestamp: number }[];
+  connected: boolean;
+} | null {
+  const win = window as any;
+
+  // Try Redux DevTools Extension connection
+  if (!reduxDevToolsSubscribed) {
+    subscribeToReduxDevTools();
+  }
+
+  // Try to get state from the NgRx store via Angular's DI
+  const storeState = getNgrxStoreState();
+  if (storeState !== undefined) {
+    return { state: storeState, actions: ngrxActionLog.slice(), connected: true };
+  }
+
+  // Check if we have actions from Redux DevTools subscription
+  if (ngrxActionLog.length > 0) {
+    return {
+      state: win.__NGRX_DEVTOOLS_LAST_STATE__ ?? null,
+      actions: ngrxActionLog.slice(),
+      connected: true,
+    };
+  }
+
+  return null;
+}
+
+function getNgrxStoreState(): unknown | undefined {
+  const ng = getNg();
+  if (!ng?.getInjector) return undefined;
+
+  const roots = document.querySelectorAll('[ng-version], [_nghost-ng-c]');
+  for (const root of roots) {
+    try {
+      const injector = ng.getInjector(root);
+      if (!injector) continue;
+
+      // Try to get the NgRx Store service from the injector
+      // NgRx Store has a `select` method and an internal `state` observable
+      const allProviders = ng.ɵgetInjectorProviders?.(injector) ?? [];
+      for (const p of allProviders) {
+        const token = p.token;
+        if (!token) continue;
+
+        // Check if this is the NgRx Store token
+        const tokenName = token.name ?? token.toString?.() ?? '';
+        if (tokenName === 'Store') {
+          try {
+            const store = injector.get(token);
+            // NgRx Store keeps current state accessible via its internal state
+            // Use a synchronous snapshot via getValue() on the underlying BehaviorSubject
+            if (store && typeof store.getValue === 'function') {
+              return safeSerialize(store.getValue());
+            }
+            // Alternative: check for the internal state property
+            if (store?._state?.getValue) {
+              return safeSerialize(store._state.getValue());
+            }
+          } catch {
+            // not resolvable at this injector level
+          }
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+  return undefined;
+}
+
+function subscribeToReduxDevTools() {
+  const win = window as any;
+
+  // Hook into __REDUX_DEVTOOLS_EXTENSION__ if it exists
+  const ext = win.__REDUX_DEVTOOLS_EXTENSION__;
+  if (!ext) return;
+
+  reduxDevToolsSubscribed = true;
+
+  // Wrap the connect method to intercept NgRx connections
+  const originalConnect = ext.connect?.bind(ext);
+  if (originalConnect) {
+    ext.connect = function (...args: unknown[]) {
+      const connection = originalConnect(...args);
+
+      // Intercept send calls to capture actions
+      const originalSend = connection.send?.bind(connection);
+      if (originalSend) {
+        connection.send = function (action: unknown, state: unknown) {
+          captureAction(action);
+          win.__NGRX_DEVTOOLS_LAST_STATE__ = safeSerialize(state);
+          return originalSend(action, state);
+        };
+      }
+
+      // Intercept init to capture initial state
+      const originalInit = connection.init?.bind(connection);
+      if (originalInit) {
+        connection.init = function (state: unknown) {
+          win.__NGRX_DEVTOOLS_LAST_STATE__ = safeSerialize(state);
+          return originalInit(state);
+        };
+      }
+
+      return connection;
+    };
+  }
+
+  // Also try to subscribe to existing connections
+  if (typeof ext.subscribe === 'function') {
+    try {
+      ext.subscribe((message: any) => {
+        if (message.type === 'ACTION' || message.type === 'DISPATCH') {
+          captureAction(message.payload);
+        }
+        if (message.state) {
+          win.__NGRX_DEVTOOLS_LAST_STATE__ = safeSerialize(
+            typeof message.state === 'string' ? JSON.parse(message.state) : message.state,
+          );
+        }
+      });
+    } catch {
+      // subscription not supported
+    }
+  }
+}
+
+function captureAction(action: unknown) {
+  if (!action) return;
+  const entry = {
+    type: (action as any).type ?? String(action),
+    payload: safeSerialize((action as any).payload ?? (action as any)),
+    timestamp: Date.now(),
+  };
+  ngrxActionLog.push(entry);
+  if (ngrxActionLog.length > MAX_ACTION_LOG) {
+    ngrxActionLog.splice(0, ngrxActionLog.length - MAX_ACTION_LOG);
+  }
+}
+
+function safeSerialize(val: unknown): unknown {
+  if (val === undefined || val === null) return val;
+  try {
+    return JSON.parse(JSON.stringify(val));
+  } catch {
+    return String(val);
+  }
+}
+
 // Auto-init when loaded as a script
 if (typeof document !== 'undefined') {
   initOverlay().catch(console.error);
+  import('./popup.ts').then((m) => m.createDevtoolsPopup()).catch(() => {});
 }

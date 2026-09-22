@@ -5,12 +5,13 @@ import { ComponentTree } from './pages/component-tree';
 import { RouteInspector } from './pages/route-inspector';
 import { SignalInspector } from './pages/signal-inspector';
 import { DiInspector } from './pages/di-inspector';
+import { StoreInspector } from './pages/store-inspector';
 
-type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors';
+type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'store';
 
 @Component({
   selector: 'app-root',
-  imports: [Dashboard, ComponentTree, RouteInspector, SignalInspector, DiInspector],
+  imports: [Dashboard, ComponentTree, RouteInspector, SignalInspector, DiInspector, StoreInspector],
   template: `
     <header>
       <div class="brand">
@@ -53,6 +54,9 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors';
         }
         @case ('injectors') {
           <app-di-inspector [rpc]="rpc()" />
+        }
+        @case ('store') {
+          <app-store-inspector [rpc]="rpc()" />
         }
       }
     </main>
@@ -126,6 +130,7 @@ export class App implements OnInit, OnDestroy {
     { id: 'routes' as Tab, label: 'Routes' },
     { id: 'signals' as Tab, label: 'Signals' },
     { id: 'injectors' as Tab, label: 'Injectors' },
+    { id: 'store' as Tab, label: 'Store' },
   ];
 
   tab = signal<Tab>('dashboard');

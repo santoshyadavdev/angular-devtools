@@ -38,6 +38,11 @@ import type { DevframeRpcClient } from 'devframe/client';
         <p class="big">{{ providerCount() }}</p>
         <p class="sub">DI providers</p>
       </div>
+      <div class="card clickable" (click)="navigate.emit('store')">
+        <h3>NgRx Store</h3>
+        <p class="big">{{ storeCount() }}</p>
+        <p class="sub">store entries</p>
+      </div>
     </div>
   `,
   styles: `
@@ -100,6 +105,7 @@ export class Dashboard {
   routeCount = signal(0);
   signalCount = signal(0);
   providerCount = signal(0);
+  storeCount = signal(0);
 
   constructor() {
     effect(() => {
@@ -107,11 +113,30 @@ export class Dashboard {
       if (!client) return;
 
       const my = client.scope('ng-devtools');
-      my.rpc.call('build-meta').then((m: any) => this.meta.set(m));
-      my.rpc.call('get-components').then((c: any[]) => this.componentCount.set(c.length));
-      my.rpc.call('get-routes').then((r: any[]) => this.routeCount.set(r.length));
-      my.rpc.call('get-signals').then((s: any[]) => this.signalCount.set(s.length));
-      my.rpc.call('get-providers').then((p: any[]) => this.providerCount.set(p.length));
+      my.rpc
+        .call('build-meta')
+        .then((m: any) => this.meta.set(m))
+        .catch(() => {});
+      my.rpc
+        .call('get-components')
+        .then((c: any[]) => this.componentCount.set(c.length))
+        .catch(() => {});
+      my.rpc
+        .call('get-routes')
+        .then((r: any[]) => this.routeCount.set(r.length))
+        .catch(() => {});
+      my.rpc
+        .call('get-signals')
+        .then((s: any[]) => this.signalCount.set(s.length))
+        .catch(() => {});
+      my.rpc
+        .call('get-providers')
+        .then((p: any[]) => this.providerCount.set(p.length))
+        .catch(() => {});
+      my.rpc
+        .call('get-ngrx-store')
+        .then((s: any[]) => this.storeCount.set(s.length))
+        .catch(() => {});
     });
   }
 }

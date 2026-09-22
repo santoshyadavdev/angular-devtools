@@ -5,6 +5,7 @@ import { getComponents } from './rpc/get-components.ts';
 import { getBuildMeta } from './rpc/build-meta.ts';
 import { getSignals } from './rpc/get-signals.ts';
 import { getProviders } from './rpc/get-providers.ts';
+import { getNgrxStore } from './rpc/get-ngrx-store.ts';
 import type {} from './types.ts';
 
 import pkg from '../package.json' with { type: 'json' };
@@ -32,6 +33,7 @@ const ngDevtools = defineDevframe({
     my.rpc.register(getComponents);
     my.rpc.register(getSignals);
     my.rpc.register(getProviders);
+    my.rpc.register(getNgrxStore);
     my.rpc.register(getBuildMeta);
 
     const componentTree = await my.rpc.sharedState('component-tree', {
@@ -60,6 +62,14 @@ const ngDevtools = defineDevframe({
       initialValue: {
         roots: [] as any[],
         selectedInjectorId: null as string | null,
+      },
+    });
+
+    const ngrxStoreState = await my.rpc.sharedState('ngrx-store', {
+      initialValue: {
+        state: null as unknown,
+        actions: [] as { type: string; payload?: unknown; timestamp: number }[],
+        connected: false,
       },
     });
 
@@ -107,6 +117,19 @@ const ngDevtools = defineDevframe({
       },
     });
 
+    my.rpc.register({
+      name: 'push-ngrx-state',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (data: { state: unknown; actions: unknown[]; connected: boolean }) => {
+        ngrxStoreState.mutate((draft) => {
+          draft.state = data.state;
+          draft.actions = data.actions as any;
+          draft.connected = data.connected;
+        });
+      },
+    });
+
     // Agent resources
     ctx.agent.registerResource({
       id: 'ng-devtools:component-tree',
@@ -131,6 +154,15 @@ const ngDevtools = defineDevframe({
       description: 'Live DI injector hierarchy with providers at each level.',
       mimeType: 'application/json',
       read: () => ({ text: JSON.stringify(injectorTreeState.value(), null, 2) }),
+    });
+
+    ctx.agent.registerResource({
+      id: 'ng-devtools:ngrx-store',
+      name: 'NgRx Store State',
+      description:
+        'Live NgRx store state and recent dispatched actions. Read this to understand the current application state managed by NgRx.',
+      mimeType: 'application/json',
+      read: () => ({ text: JSON.stringify(ngrxStoreState.value(), null, 2) }),
     });
 
     // Agent tools

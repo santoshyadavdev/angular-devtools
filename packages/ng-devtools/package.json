@@ -10,7 +10,8 @@
   "exports": {
     ".": "./src/devframe.ts",
     "./devframe": "./src/devframe.ts",
-    "./overlay": "./src/overlay.ts"
+    "./overlay": "./src/overlay.ts",
+    "./popup": "./src/popup.ts"
   },
   "files": [
     "src",

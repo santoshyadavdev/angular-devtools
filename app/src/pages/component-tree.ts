@@ -10,6 +10,15 @@ interface ComponentInfo {
   isStandalone: boolean;
 }
 
+interface ProviderEntry {
+  token: string;
+  source: string;
+  file: string;
+  line: number;
+  providedIn?: string;
+  type: string;
+}
+
 @Component({
   selector: 'app-component-tree',
   imports: [JsonPipe],
@@ -54,7 +63,37 @@ interface ComponentInfo {
     @if (selected()) {
       <aside class="detail">
         <h3>&lt;{{ selected()!.selector }}&gt;</h3>
-        <pre>{{ selected() | json }}</pre>
+        <dl>
+          <dt>File</dt>
+          <dd>{{ selected()!.file }}</dd>
+          @if (selected()!.inputs.length) {
+            <dt>Inputs</dt>
+            <dd>{{ selected()!.inputs.join(', ') }}</dd>
+          }
+          @if (selected()!.outputs.length) {
+            <dt>Outputs</dt>
+            <dd>{{ selected()!.outputs.join(', ') }}</dd>
+          }
+          <dt>Standalone</dt>
+          <dd>{{ selected()!.isStandalone ? 'Yes' : 'No' }}</dd>
+        </dl>
+
+        @if (selectedProviders().length) {
+          <h4>Injected Providers</h4>
+          <ul class="provider-list" role="list">
+            @for (p of selectedProviders(); track p.token + p.line) {
+              <li class="provider-item">
+                <span class="provider-token">{{ p.token }}</span>
+                <span class="provider-type">{{ p.type }}</span>
+                @if (p.source && p.source !== 'class' && p.source !== 'providers array') {
+                  <span class="provider-source">→ {{ p.source }}</span>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="no-providers">No injected providers detected.</p>
+        }
       </aside>
     }
   `,
@@ -140,12 +179,64 @@ interface ComponentInfo {
     .detail h3 {
       font-family: monospace;
       color: #a78bfa;
+      margin-bottom: 12px;
+    }
+    dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    dt {
+      color: #71717a;
+    }
+    dd {
+      color: #e4e4e7;
+    }
+    h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #71717a;
       margin-bottom: 8px;
     }
-    pre {
-      font-size: 12px;
+    .provider-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .provider-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: #09090b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .provider-token {
+      font-family: monospace;
+      color: #e4e4e7;
+      font-weight: 600;
+    }
+    .provider-type {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #3f3f46;
       color: #a1a1aa;
-      white-space: pre-wrap;
+    }
+    .provider-source {
+      font-size: 12px;
+      color: #71717a;
+    }
+    .no-providers {
+      font-size: 13px;
+      color: #52525b;
     }
   `,
 })
@@ -153,9 +244,11 @@ export class ComponentTree {
   rpc = input<DevframeRpcClient | null>(null);
 
   components = signal<ComponentInfo[]>([]);
+  allProviders = signal<ProviderEntry[]>([]);
   filter = signal('');
   loading = signal(false);
   selected = signal<ComponentInfo | null>(null);
+  selectedProviders = signal<ProviderEntry[]>([]);
 
   filtered = signal<ComponentInfo[]>([]);
 
@@ -178,8 +271,12 @@ export class ComponentTree {
     this.loading.set(true);
     try {
       const my = client.scope('ng-devtools');
-      const result = (await my.rpc.call('get-components')) as ComponentInfo[];
-      this.components.set(result);
+      const [comps, providers] = await Promise.all([
+        my.rpc.call('get-components') as Promise<ComponentInfo[]>,
+        my.rpc.call('get-providers') as Promise<ProviderEntry[]>,
+      ]);
+      this.components.set(comps);
+      this.allProviders.set(providers);
     } finally {
       this.loading.set(false);
     }
@@ -187,6 +284,7 @@ export class ComponentTree {
 
   select(comp: ComponentInfo) {
     this.selected.set(comp);
+    this.selectedProviders.set(this.allProviders().filter((p) => p.file === comp.file));
     const client = this.rpc();
     if (client) {
       client.scope('ng-devtools').rpc.callEvent('select-component', comp.selector);

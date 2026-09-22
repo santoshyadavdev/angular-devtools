@@ -63,6 +63,71 @@ export interface InjectorTreeNode {
   children: InjectorTreeNode[];
 }
 
+// --- NgRx Store types ---
+
+export interface NgrxActionInfo {
+  name: string;
+  source: string;
+  file: string;
+  line: number;
+}
+
+export interface NgrxReducerInfo {
+  name: string;
+  featureKey?: string;
+  actions: string[];
+  file: string;
+  line: number;
+}
+
+export interface NgrxEffectInfo {
+  name: string;
+  actions: string[];
+  file: string;
+  line: number;
+}
+
+export interface NgrxSelectorInfo {
+  name: string;
+  file: string;
+  line: number;
+}
+
+export interface NgrxFeatureInfo {
+  name: string;
+  featureKey: string;
+  file: string;
+  line: number;
+}
+
+export interface NgrxStoreEntry {
+  name: string;
+  kind:
+    | 'action'
+    | 'reducer'
+    | 'effect'
+    | 'selector'
+    | 'feature'
+    | 'store-setup'
+    | 'signal-store'
+    | 'signal-state'
+    | 'signal-method';
+  file: string;
+  line: number;
+  detail?: string;
+}
+
+export interface NgrxRuntimeAction {
+  type: string;
+  payload?: unknown;
+  timestamp: number;
+}
+
+export interface NgrxRuntimeState {
+  state: unknown;
+  actions: NgrxRuntimeAction[];
+}
+
 declare module 'devframe' {
   interface DevframeRpcSharedStates {
     'ng-devtools:component-tree': {
@@ -81,6 +146,11 @@ declare module 'devframe' {
     'ng-devtools:injector-tree': {
       roots: InjectorTreeNode[];
       selectedInjectorId: string | null;
+    };
+    'ng-devtools:ngrx-store': {
+      state: unknown;
+      actions: NgrxRuntimeAction[];
+      connected: boolean;
     };
   }
 }
