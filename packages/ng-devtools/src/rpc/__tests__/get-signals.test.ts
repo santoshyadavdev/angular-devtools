@@ -141,6 +141,41 @@ describe('get-signals', () => {
     ]);
   });
 
+  it('reads a declaration assigned through this, but not other members', async () => {
+    const signals = await signalsFor(`
+      class Counter {
+        constructor() {
+          this.total = signal(0)
+          this.store.count = signal(0)
+        }
+      }
+    `);
+    expect(signals.map((s) => s.name)).toEqual(['total']);
+  });
+
+  it('finds the class body past a generic constraint', async () => {
+    const signals = await signalsFor(`
+      @Component({ selector: 'app-panel' })
+      export class Panel<T extends { id: string }> {
+        value = signal(0)
+      }
+    `);
+    expect(signals.map((s) => [s.name, s.component])).toEqual([['value', 'app-panel']]);
+  });
+
+  it('ignores a decorator written inside a template', async () => {
+    const signals = await signalsFor(
+      '@Component({\n' +
+        "  selector: 'app-docs',\n" +
+        "  template: `<pre>@Component({ selector: 'fake' })</pre>`,\n" +
+        '})\n' +
+        'export class Docs {\n' +
+        '  shown = signal(true)\n' +
+        '}\n',
+    );
+    expect(signals.map((s) => [s.name, s.component])).toEqual([['shown', 'app-docs']]);
+  });
+
   it('ignores declarations in comments', async () => {
     const signals = await signalsFor(`
       class Counter {

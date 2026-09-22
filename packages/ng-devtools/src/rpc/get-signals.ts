@@ -60,9 +60,11 @@ const KINDS: Record<string, string> = {
 // One pass over the file: `name = fn(` or `name = fn.required(`, with the
 // optional `.required` part of the same match so a required input is not also
 // reported as a plain input. The name may be a private field and may carry a
-// single line type annotation, as in `readonly total: Signal<number> =`.
+// single line type annotation, as in `readonly total: Signal<number> =`. A
+// `this.` prefix is a declaration too, but any other member assignment, as in
+// `store.count = signal(0)`, is not, hence the lookbehind.
 const SIGNAL_CALL = new RegExp(
-  String.raw`(#?[$\w]+)\s*(?::[^=;\n]+)?=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
+  String.raw`(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::[^=;\n]+)?=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
   'g',
 );
 
@@ -139,13 +141,16 @@ function classScopes(code: string, source: string): ClassScope[] {
   // `code` has string contents masked out, so a class written inside a
   // template cannot open a scope; `source` still holds the selector to read.
   while ((match = declaration.exec(code)) !== null) {
-    const bodyStart = code.indexOf('{', match.index + match[0].length);
+    const bodyStart = classBodyStart(code, match.index + match[0].length);
     if (bodyStart === -1) break;
     const end = matchDelimiter(code, bodyStart, '{', '}');
     scopes.push({
       start: match.index,
       end,
-      component: decoratorSelector(source.slice(previousEnd, match.index)),
+      component: decoratorSelector(
+        code.slice(previousEnd, match.index),
+        source.slice(previousEnd, match.index),
+      ),
     });
     previousEnd = end;
     declaration.lastIndex = end;
@@ -153,12 +158,33 @@ function classScopes(code: string, source: string): ClassScope[] {
   return scopes;
 }
 
-/** The selector of the last `@Component`/`@Directive` decorator in `text`. */
-function decoratorSelector(text: string): string | undefined {
-  const at = Math.max(text.lastIndexOf('@Component('), text.lastIndexOf('@Directive('));
+/**
+ * The first `{` that opens the class body, skipping the braces a generic
+ * parameter list can hold, as in `class Panel<T extends { id: string }> {`.
+ */
+function classBodyStart(code: string, from: number): number {
+  let angle = 0;
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === '"' || ch === "'" || ch === '`') i = skipString(code, i);
+    else if (ch === '<') angle++;
+    else if (ch === '>' && angle > 0) angle--;
+    else if (ch === '{' && angle === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * The selector of the last `@Component`/`@Directive` decorator in `code`, read
+ * out of `source` at the same offsets. The decorator is located in the masked
+ * copy so that one written inside a template cannot be picked up, and the
+ * selector is read from the unmasked copy, where its value survives.
+ */
+function decoratorSelector(code: string, source: string): string | undefined {
+  const at = Math.max(code.lastIndexOf('@Component('), code.lastIndexOf('@Directive('));
   if (at === -1) return undefined;
-  const open = text.indexOf('(', at);
-  const args = text.slice(open, matchDelimiter(text, open, '(', ')'));
+  const open = code.indexOf('(', at);
+  const args = source.slice(open, matchDelimiter(code, open, '(', ')'));
   return args.match(/selector:\s*['"`]([^'"`]+)['"`]/)?.[1];
 }
 
