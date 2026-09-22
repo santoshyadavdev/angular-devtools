@@ -96,6 +96,13 @@ describe('get-routes', () => {
     ])
   })
 
+  it('does not treat nested route metadata as a route', async () => {
+    const routes = await routesFor(`[
+      { path: 'home', component: HomeComponent, data: { path: 'label', breadcrumb: 'Home' } },
+    ]`)
+    expect(routes.map(r => [r.path, r.component])).toEqual([['home', 'HomeComponent']])
+  })
+
   it('only flags children on the route that has them', async () => {
     const routes = await routesFor(`[
       { path: 'admin', component: Admin, children: [{ path: 'users', component: Users }] },

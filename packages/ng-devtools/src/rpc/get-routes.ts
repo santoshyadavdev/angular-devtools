@@ -86,12 +86,15 @@ function routeComponent(props: Map<string, string>): string | undefined {
 
 function objectLiterals(source: string): string[] {
   const spans: [number, number][] = []
-  const open: number[] = []
+  const open: { ch: string; at: number; inArray: boolean }[] = []
   for (let i = 0; i < source.length; i++) {
     const ch = source[i]
     if (ch === '"' || ch === "'" || ch === '`') i = skipString(source, i)
-    else if (ch === '{') open.push(i)
-    else if (ch === '}' && open.length) spans.push([open.pop()!, i])
+    else if ('([{'.includes(ch)) open.push({ ch, at: i, inArray: open.at(-1)?.ch === '[' })
+    else if (')]}'.includes(ch)) {
+      const closed = open.pop()
+      if (ch === '}' && closed?.ch === '{' && closed.inArray) spans.push([closed.at, i])
+    }
   }
   return spans.sort((a, b) => a[0] - b[0]).map(([start, end]) => source.slice(start + 1, end))
 }
