@@ -1,5 +1,6 @@
 import { defineRpcFunction } from 'devframe';
 import * as v from 'valibot';
+import { describable } from './agent-schema.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -17,7 +18,7 @@ export const getBuildMeta = defineRpcFunction({
   jsonSerializable: true,
   snapshot: true,
   args: [],
-  returns: BuildMetaSchema,
+  returns: describable(BuildMetaSchema),
   agent: {
     description:
       'Angular project metadata: framework version, TypeScript version, SSR status. Baked into static builds. Call this before suggesting dependency or config changes.',

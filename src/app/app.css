@@ -1,7 +1,7 @@
 :host {
   display: block;
   min-height: 100vh;
-  background: #fafafa;
+  background: var(--page);
 }
 
 .navbar {
@@ -9,25 +9,45 @@
   align-items: center;
   gap: 32px;
   padding: 0 24px;
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  min-height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 3px var(--shadow);
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
+/* The bar carries five items; below this it needs two rows rather than
+   clipping the last of them off the screen. */
+@media (max-width: 700px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 8px 16px;
+  }
+  .nav-links {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
 .brand {
+  white-space: nowrap;
   font-weight: 700;
   font-size: 16px;
-  color: #7c3aed;
   text-decoration: none;
   letter-spacing: -0.01em;
+  color: var(--brand);
+}
+
+.navbar app-theme-toggle {
+  margin-left: auto;
 }
 
 .nav-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -36,7 +56,7 @@
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--muted);
   text-decoration: none;
   transition:
     background 0.15s,
@@ -44,11 +64,25 @@
 }
 
 .nav-links a:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--subtle);
+  color: var(--ink);
 }
 
 .nav-links a.active {
-  background: #ede9fe;
-  color: #7c3aed;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 8px 16px;
+  background: var(--surface);
+  color: var(--brand);
+}
+
+.skip-link:focus {
+  left: 0;
 }

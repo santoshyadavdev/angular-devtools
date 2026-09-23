@@ -21,7 +21,7 @@ const ngDevtools = defineDevframe({
   version: pkg.version,
   packageName: pkg.name,
   description: 'Inspect Angular component trees, signals, and routes at dev and build time.',
-  homepage: 'https://github.com/user/angular-devtools',
+  homepage: 'https://github.com/santoshyadavdev/angular-devtools',
   icon: 'ph:angular-logo-duotone',
   importMetaUrl: import.meta.url,
   clientAssets,
@@ -134,7 +134,8 @@ const ngDevtools = defineDevframe({
     ctx.agent.registerResource({
       id: 'ng-devtools:component-tree',
       name: 'Angular Component Tree',
-      description: 'Live component hierarchy snapshot as JSON.',
+      description:
+        'Component hierarchy last reported by a connected page, as JSON. Empty when no page is connected.',
       mimeType: 'application/json',
       read: () => ({ text: JSON.stringify(componentTree.value(), null, 2) }),
     });
@@ -151,7 +152,8 @@ const ngDevtools = defineDevframe({
     ctx.agent.registerResource({
       id: 'ng-devtools:injector-tree',
       name: 'Angular Injector Tree',
-      description: 'Live DI injector hierarchy with providers at each level.',
+      description:
+        'DI injector hierarchy last reported by a connected page, with providers at each level. Empty when no page is connected.',
       mimeType: 'application/json',
       read: () => ({ text: JSON.stringify(injectorTreeState.value(), null, 2) }),
     });
@@ -160,7 +162,7 @@ const ngDevtools = defineDevframe({
       id: 'ng-devtools:ngrx-store',
       name: 'NgRx Store State',
       description:
-        'Live NgRx store state and recent dispatched actions. Read this to understand the current application state managed by NgRx.',
+        'NgRx store state and recent actions last reported by a connected page. Empty when no page is connected.',
       mimeType: 'application/json',
       read: () => ({ text: JSON.stringify(ngrxStoreState.value(), null, 2) }),
     });
@@ -181,20 +183,27 @@ const ngDevtools = defineDevframe({
         required: ['selector'],
       },
       handler: async (args: { selector: string }) => {
+        if (!componentTree.value().nodes.length) {
+          return {
+            markdown: `No page is connected, so nothing was highlighted. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
+          };
+        }
         await ctx.rpc.invokeLocal('ng-devtools:select-component' as any, args.selector);
         void my.rpc.broadcast({
           method: 'highlight-in-page',
           args: [args.selector],
           optional: true,
         });
-        return { markdown: `Highlighted \`${args.selector}\` in the page overlay.` };
+        return {
+          markdown: `Sent a highlight request for \`${args.selector}\`. It only shows if the selector matches an element on the page.`,
+        };
       },
     });
 
     ctx.agent.registerTool({
       id: 'ng-devtools:inspect-signals',
       description:
-        'Get the signal graph for a specific component by CSS selector. Returns signal nodes (signal, computed, linkedSignal, effect) and their dependency edges. Call this to understand reactive data flow before suggesting state changes.',
+        'Get the signal graph the running page last reported: signal nodes (signal, computed, linkedSignal, effect) and their dependency edges. The page reports one graph, for its root component, so a selector that does not match it returns what is available instead.',
       safety: 'read',
       inputSchema: {
         type: 'object',
@@ -207,27 +216,28 @@ const ngDevtools = defineDevframe({
         required: ['selector'],
       },
       handler: async (args: { selector: string }) => {
-        try {
-          const result = await my.rpc.broadcast({
-            method: 'get-signal-graph-for',
-            args: [args.selector],
-          });
-          return { markdown: JSON.stringify(result, null, 2) };
-        } catch {
-          const cached = signalGraphState.value().graph;
+        // `broadcast` resolves with nothing, so the page cannot answer a
+        // question. Read the graph the overlay pushes into shared state.
+        const graph = signalGraphState.value().graph;
+        if (!graph) {
           return {
-            markdown: cached
-              ? JSON.stringify(cached, null, 2)
-              : 'No signal graph available. Is the Angular app running with debug mode?',
+            markdown: `No signal graph available. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
           };
         }
+        const json = JSON.stringify(graph, null, 2);
+        if (graph.componentSelector !== args.selector) {
+          return {
+            markdown: `No signal graph for \`${args.selector}\`. The live graph covers \`${graph.componentSelector}\`:\n\n${json}`,
+          };
+        }
+        return { markdown: json };
       },
     });
 
     ctx.agent.registerTool({
       id: 'ng-devtools:inspect-providers',
       description:
-        'Get DI providers and the injector resolution path for a component by CSS selector. Call this to understand dependency injection before suggesting provider changes.',
+        'Get the DI injector hierarchy the running page last reported, with the providers at each level. The page reports the whole tree rather than one component, so the selector only labels the answer.',
       safety: 'read',
       inputSchema: {
         type: 'object',
@@ -240,20 +250,15 @@ const ngDevtools = defineDevframe({
         required: ['selector'],
       },
       handler: async (args: { selector: string }) => {
-        try {
-          const result = await my.rpc.broadcast({
-            method: 'get-providers-for',
-            args: [args.selector],
-          });
-          return { markdown: JSON.stringify(result, null, 2) };
-        } catch {
-          const cached = injectorTreeState.value().roots;
+        const roots = injectorTreeState.value().roots;
+        if (!roots.length) {
           return {
-            markdown: cached.length
-              ? JSON.stringify(cached, null, 2)
-              : 'No injector data available.',
+            markdown: `No injector data available. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
           };
         }
+        return {
+          markdown: `This is the injector tree for the whole page, not filtered to \`${args.selector}\`:\n\n${JSON.stringify(roots, null, 2)}`,
+        };
       },
     });
   },

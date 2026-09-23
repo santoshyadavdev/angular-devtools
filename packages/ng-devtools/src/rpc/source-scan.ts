@@ -1,14 +1,58 @@
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+
 // Helpers shared by the RPC functions that read information out of source
 // files with regular expressions. None of them parse TypeScript; they only do
 // enough lexing to keep strings and comments from being mistaken for code.
 
-/** Index of the quote that closes the string starting at `start`. */
-export function skipString(source: string, start: number): number {
+/**
+ * Index of the `/` that closes the regular expression starting at `start`, or
+ * `start` itself when this is a division rather than a literal.
+ */
+export function skipRegex(source: string, start: number): number {
+  let inClass = false;
   for (let i = start + 1; i < source.length; i++) {
-    if (source[i] === '\\') i++;
-    else if (source[i] === source[start]) return i;
+    const ch = source[i];
+    if (ch === '\\') i++;
+    else if (ch === '\n') return start;
+    else if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (ch === '/' && !inClass) return i;
   }
-  return source.length;
+  return start;
+}
+
+/** Whether the `/` at `at` opens a regular expression rather than dividing. */
+export function startsRegex(source: string, at: number): boolean {
+  for (let i = at - 1; i >= 0; i--) {
+    const ch = source[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') continue;
+    // After a value, `/` divides; after an operator or a keyword, it opens one.
+    return (
+      !/[\w$)\]]/.test(ch) || /\b(return|typeof|case|in|of|do|else)$/.test(source.slice(0, i + 1))
+    );
+  }
+  return true;
+}
+
+/**
+ * Index of the quote that closes the string starting at `start`, or `start`
+ * itself when there is none.
+ *
+ * Only a template literal may span lines, so a `'` or `"` left open at the end
+ * of its line is not a string at all. It is usually a quote inside a regular
+ * expression, as in `/['"]/`, and treating it as a string would blank out the
+ * rest of the file.
+ */
+export function skipString(source: string, start: number): number {
+  const quote = source[start];
+  for (let i = start + 1; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '\\') i++;
+    else if (ch === quote) return i;
+    else if (ch === '\n' && quote !== '`') return start;
+  }
+  return start;
 }
 
 /**
@@ -19,19 +63,33 @@ export function stripComments(source: string): string {
   let out = '';
   for (let i = 0; i < source.length; i++) {
     const ch = source[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
-      const end = skipString(source, i);
-      out += source.slice(i, end + 1);
-      i = end;
-    } else if (source.startsWith('//', i)) {
+    // Comments first: `//` would otherwise look like an empty regex literal.
+    if (source.startsWith('//', i)) {
       const end = source.indexOf('\n', i);
-      out += ' '.repeat((end === -1 ? source.length : end) - i);
-      i = (end === -1 ? source.length : end) - 1;
-    } else if (source.startsWith('/*', i)) {
-      const end = source.indexOf('*/', i + 2);
-      const stop = end === -1 ? source.length : end + 2;
+      const stop = end === -1 ? source.length : end;
       out += blank(source.slice(i, stop));
       i = stop - 1;
+    } else if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      if (end === -1) {
+        // Unterminated, so not a comment; blanking here would erase the file.
+        out += ch;
+        continue;
+      }
+      out += blank(source.slice(i, end + 2));
+      i = end + 1;
+    } else if (ch === '/' && startsRegex(source, i)) {
+      const end = skipRegex(source, i);
+      out += source.slice(i, end + 1);
+      i = end;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      const end = skipString(source, i);
+      if (end === i) {
+        out += ch;
+        continue;
+      }
+      out += source.slice(i, end + 1);
+      i = end;
     } else {
       out += ch;
     }
@@ -48,8 +106,17 @@ export function maskStrings(source: string): string {
   let out = '';
   for (let i = 0; i < source.length; i++) {
     const ch = source[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
+    if (ch === '/' && startsRegex(source, i)) {
+      const end = skipRegex(source, i);
+      out += source.slice(i, end + 1);
+      i = end;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
       const end = skipString(source, i);
+      if (end === i) {
+        // Not a string after all, so the quote is just a character.
+        out += ch;
+        continue;
+      }
       out += ch + blank(source.slice(i + 1, end)) + (end < source.length ? source[end] : '');
       i = end;
     } else {
@@ -59,16 +126,212 @@ export function maskStrings(source: string): string {
   return out;
 }
 
-/** The 1-based line number of `index` in `source`. */
-export function lineAt(source: string, index: number): number {
-  let line = 1;
-  for (let i = 0; i < index && i < source.length; i++) {
-    if (source[i] === '\n') line++;
+/**
+ * A reusable line lookup for one file. Scanning for newlines on every match is
+ * quadratic over a file; this walks it once and then binary searches.
+ */
+export function lineCounter(source: string): (index: number) => number {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === '\n') starts.push(i + 1);
   }
-  return line;
+  return (index) => {
+    let low = 0;
+    let high = starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (starts[mid] <= index) low = mid;
+      else high = mid - 1;
+    }
+    return low + 1;
+  };
 }
 
 /** Same length as `text`, with every character but the newlines blanked out. */
 function blank(text: string): string {
   return text.replace(/[^\n]/g, ' ');
+}
+
+/** A class body, with the selector of the decorator that precedes it. */
+export interface ClassScope {
+  start: number;
+  end: number;
+  component?: string;
+}
+
+const DECORATOR = /@(?:Component|Directive)\s*\(/g;
+
+/**
+ * The span of every class in the file, each with the selector of the
+ * `@Component` or `@Directive` decorating it.
+ */
+export function classScopes(code: string, source: string): ClassScope[] {
+  const scopes: ClassScope[] = [];
+  const declaration = /\bclass\s+\w+/g;
+  let previousEnd = 0;
+  let match: RegExpExecArray | null;
+  // `code` has string contents masked out, so a class written inside a
+  // template cannot open a scope; `source` still holds the selector to read.
+  while ((match = declaration.exec(code)) !== null) {
+    const bodyStart = classBodyStart(code, match.index + match[0].length);
+    if (bodyStart === -1) break;
+    const end = matchDelimiter(code, bodyStart, '{', '}');
+    scopes.push({
+      start: match.index,
+      end,
+      component: decoratorSelector(
+        code.slice(previousEnd, match.index),
+        source.slice(previousEnd, match.index),
+      ),
+    });
+    previousEnd = end;
+    declaration.lastIndex = end;
+  }
+  return scopes;
+}
+
+/**
+ * The first `{` that opens the class body, skipping the braces a generic
+ * parameter list can hold, as in `class Panel<T extends { id: string }> {`.
+ */
+function classBodyStart(code: string, from: number): number {
+  let angle = 0;
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === '/' && startsRegex(code, i)) i = skipRegex(code, i);
+    else if (ch === '"' || ch === "'" || ch === '`') i = skipString(code, i);
+    else if (ch === '<') angle++;
+    else if (ch === '>' && angle > 0) angle--;
+    else if (ch === '{' && angle === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * The selector of the last `@Component`/`@Directive` decorator in `code`, read
+ * out of `source` at the same offsets. Both the decorator and the `selector`
+ * key are found in the masked copy, so neither a decorator nor a `selector:`
+ * written inside a template can be picked up, and only the value is read from
+ * the unmasked copy, where it survives.
+ */
+function decoratorSelector(code: string, source: string): string | undefined {
+  let open = -1;
+  for (const match of code.matchAll(DECORATOR)) open = match.index + match[0].length - 1;
+  if (open === -1) return undefined;
+  const args = code.slice(open, matchDelimiter(code, open, '(', ')'));
+  const key = /\bselector\s*:\s*['"`]/.exec(args);
+  if (!key) return undefined;
+  const quote = open + key.index + key[0].length - 1;
+  return source.slice(quote + 1, skipString(source, quote));
+}
+
+/** Index of the delimiter that closes the one at `open`. */
+export function matchDelimiter(source: string, open: number, start: string, end: string): number {
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'" || ch === '`') i = skipString(source, i);
+    else if (ch === '/' && i > open && startsRegex(source, i)) i = skipRegex(source, i);
+    else if (ch === start) depth++;
+    else if (ch === end && --depth === 0) return i;
+  }
+  return source.length;
+}
+
+/**
+ * The directories to scan for source files: every `sourceRoot` in
+ * `angular.json`, so a workspace with more than one project is covered, and
+ * `src` for a project without one. Falls back to the working directory.
+ */
+export function sourceRoots(cwd: string): string[] {
+  const roots: string[] = [];
+  try {
+    const workspace = JSON.parse(readFileSync(join(cwd, 'angular.json'), 'utf-8'));
+    const projects = workspace?.projects;
+    for (const project of Object.values(projects ?? {})) {
+      if (!project || typeof project !== 'object') continue;
+      const entry = project as Record<string, unknown>;
+      const root = entry['sourceRoot'] ?? join(String(entry['root'] ?? ''), 'src');
+      if (typeof root === 'string' && root) roots.push(resolve(cwd, root));
+    }
+  } catch {
+    // no workspace file, or it is not readable
+  }
+  const declared = new Set(roots);
+  roots.push(join(cwd, 'src'));
+
+  // Resolve symlinks before comparing: `resolve()` is only string work, so a
+  // `sourceRoot` that is a link, or a `src` that is, would otherwise pass the
+  // containment check and have its files reported as if they were in here.
+  const root = realPath(cwd);
+  const seen = new Set<string>();
+  const usable = [...new Set(roots)].filter((dir) => {
+    const real = realPath(dir);
+    if (seen.has(real)) return false;
+    const inside = relative(root, real);
+    // Must be a strict descendant: `.` resolves to the workspace itself, which
+    // would widen every scan to the whole repository.
+    if (!inside || inside.startsWith('..') || isAbsolute(inside)) return false;
+    // A declared `sourceRoot` is deliberate, so a project really rooted at
+    // `src/build` is honoured; only dependencies are refused outright.
+    const refused = declared.has(dir) ? DEPENDENCY_DIRS : IGNORED_DIRS;
+    if (inside.split(/[\\/]/).some((part) => refused.has(part.toLowerCase()))) return false;
+    try {
+      if (!statSync(real).isDirectory()) return false;
+    } catch {
+      return false;
+    }
+    seen.add(real);
+    return true;
+  });
+
+  // A root nested inside another would report everything under it twice.
+  // Sorted, a root can only be nested inside the last covering one, so this
+  // stays linear on a workspace with hundreds of projects.
+  const kept: string[] = [];
+  let cover: string | undefined;
+  for (const dir of usable.sort()) {
+    const inCover = cover && !relative(cover, dir).startsWith('..');
+    if (inCover) {
+      // The walk refuses to descend into a generated directory, so a project
+      // declared below one is only reachable by starting there.
+      const crosses = relative(cover!, dir)
+        .split(/[\\/]/)
+        .some((part) => IGNORED_DIRS.has(part.toLowerCase()));
+      if (!crosses) continue;
+      kept.push(dir);
+      continue;
+    }
+    kept.push(dir);
+    cover = dir;
+  }
+  return kept;
+}
+
+/** Directories holding third-party code, never scanned even when declared. */
+export const DEPENDENCY_DIRS = new Set(['node_modules', '.git', '.yarn']);
+
+/** Directories that never hold project source. */
+export const IGNORED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'out-tsc',
+  'coverage',
+  'tmp',
+  '.angular',
+  '.git',
+  '.nx',
+  '.cache',
+  '.turbo',
+  '.yarn',
+]);
+
+/** The path with symlinks resolved, or the path itself when it does not exist. */
+function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
 }

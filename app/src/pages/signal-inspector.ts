@@ -204,7 +204,7 @@ const KIND_COLORS: Record<string, string> = {
       outline: none;
     }
     input:focus {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .label {
       font-size: 13px;
@@ -264,7 +264,7 @@ const KIND_COLORS: Record<string, string> = {
       border-color: #3f3f46;
     }
     .node-card.selected {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .node-header {
       display: flex;
@@ -318,7 +318,7 @@ const KIND_COLORS: Record<string, string> = {
     }
     .detail-panel h3 {
       font-family: monospace;
-      color: #a78bfa;
+      color: var(--accent);
       margin-bottom: 12px;
     }
     .detail-panel h4 {

@@ -14,10 +14,12 @@ import { CurrencyPipe } from '@angular/common';
         <input
           type="text"
           placeholder="Search products…"
+          aria-label="Search products"
           [value]="store.filter.query()"
           (input)="store.updateFilter($any($event.target).value)"
         />
         <select
+          aria-label="Filter by category"
           [value]="store.filter.category()"
           (change)="store.filterByCategory($any($event.target).value)"
         >
@@ -66,8 +68,10 @@ import { CurrencyPipe } from '@angular/common';
     }
     input,
     select {
+      background: var(--surface);
+      color: var(--ink);
       padding: 8px 12px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--line-strong);
       border-radius: 6px;
       font-size: 14px;
     }
@@ -77,10 +81,10 @@ import { CurrencyPipe } from '@angular/common';
     }
     .stock-info {
       font-size: 13px;
-      color: #6b7280;
+      color: var(--muted);
     }
     .loading {
-      color: #6b7280;
+      color: var(--muted);
       text-align: center;
       padding: 40px;
     }
@@ -92,7 +96,7 @@ import { CurrencyPipe } from '@angular/common';
     .card {
       display: block;
       padding: 20px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--line);
       border-radius: 10px;
       text-decoration: none;
       color: inherit;
@@ -101,8 +105,8 @@ import { CurrencyPipe } from '@angular/common';
         box-shadow 0.15s;
     }
     .card:hover {
-      border-color: #7c3aed;
-      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+      border-color: var(--brand);
+      box-shadow: 0 2px 8px var(--shadow);
     }
     h3 {
       font-size: 16px;
@@ -111,27 +115,27 @@ import { CurrencyPipe } from '@angular/common';
     .price {
       font-size: 20px;
       font-weight: 700;
-      color: #7c3aed;
+      color: var(--brand);
       margin-bottom: 4px;
     }
     .category {
       font-size: 13px;
-      color: #6b7280;
+      color: var(--muted);
       margin-bottom: 8px;
     }
     .stock {
       font-size: 12px;
       padding: 2px 8px;
       border-radius: 99px;
-      background: #d1fae5;
-      color: #065f46;
+      background: var(--ok-soft);
+      color: var(--ok-ink);
     }
     .stock.out {
-      background: #fee2e2;
-      color: #991b1b;
+      background: var(--danger-soft);
+      color: var(--danger-ink);
     }
     .empty {
-      color: #6b7280;
+      color: var(--muted);
       text-align: center;
       grid-column: 1 / -1;
       padding: 40px;

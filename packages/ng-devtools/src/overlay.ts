@@ -2,8 +2,10 @@ import { connectDevframe } from 'devframe/client';
 
 let highlightEl: HTMLElement | null = null;
 
-export async function initOverlay() {
-  const rpc = await connectDevframe();
+export async function initOverlay(options: { baseURL?: string | string[] } = {}) {
+  // `connectDevframe()` alone looks for the connection next to the page, which
+  // misses the documented `/__ng-devtools/` mount in a host app.
+  const rpc = await connectDevframe({ baseURL: options.baseURL ?? ['./', '/__ng-devtools/'] });
   const my = rpc.scope('ng-devtools');
 
   async function pushTree() {
@@ -44,32 +46,14 @@ export async function initOverlay() {
     jsonSerializable: true,
     handler: (selector: string) => {
       clearHighlight();
-      const el = document.querySelector(selector);
+      // The selector comes from an agent, so it may not be valid CSS.
+      let el: Element | null = null;
+      try {
+        el = document.querySelector(selector);
+      } catch {
+        return;
+      }
       if (el instanceof HTMLElement) showHighlight(el);
-    },
-  });
-
-  // On-demand signal graph for a specific component
-  my.rpc.register({
-    name: 'get-signal-graph-for',
-    type: 'query',
-    jsonSerializable: true,
-    handler: (selector: string) => {
-      const el = document.querySelector(selector);
-      if (!el) return null;
-      return getSignalGraphForElement(el);
-    },
-  });
-
-  // On-demand DI providers for a specific component
-  my.rpc.register({
-    name: 'get-providers-for',
-    type: 'query',
-    jsonSerializable: true,
-    handler: (selector: string) => {
-      const el = document.querySelector(selector);
-      if (!el) return null;
-      return getProvidersForElement(el);
     },
   });
 

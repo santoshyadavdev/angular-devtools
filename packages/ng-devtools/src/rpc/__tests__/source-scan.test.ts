@@ -1,0 +1,141 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fixtureDir } from './fixture-dir.ts';
+import { describe, expect, it } from 'vitest';
+import { getComponents } from '../get-components.ts';
+import { getProviders } from '../get-providers.ts';
+import { getRoutes } from '../get-routes.ts';
+import { getSignals } from '../get-signals.ts';
+import {
+  lineCounter,
+  maskStrings,
+  matchDelimiter,
+  sourceRoots,
+  stripComments,
+} from '../source-scan.ts';
+
+function workspace(files: Record<string, string>, workspaceJson?: unknown) {
+  const dir = fixtureDir('ng-devtools-scan-');
+  if (workspaceJson) writeFileSync(join(dir, 'angular.json'), JSON.stringify(workspaceJson));
+  for (const [path, contents] of Object.entries(files)) {
+    const at = join(dir, path);
+    mkdirSync(join(at, '..'), { recursive: true });
+    writeFileSync(at, contents);
+  }
+  return dir;
+}
+
+describe('lexing', () => {
+  it('does not treat a quote inside a regular expression as a string', () => {
+    const source = 'const re = /[\'"]/;\nconst after = 1;\n';
+    expect(maskStrings(source)).toBe(source);
+    expect(stripComments(source)).toBe(source);
+  });
+
+  it('keeps scanning past a regular expression that contains a quote', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        "@Component({ selector: 'app-first', template: '' })",
+        'export class First {}',
+        "const slug = (s: string) => s.replace(/['\"]/g, '');",
+        "@Component({ selector: 'app-second', template: '' })",
+        'export class Second { count = signal(0); }',
+      ].join('\n'),
+    });
+
+    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(components.map((c) => c.selector)).toEqual(['app-first', 'app-second']);
+
+    const signals = await getSignals.setup({ cwd: dir } as never).handler();
+    expect(signals.map((s) => s.name)).toEqual(['count']);
+  });
+
+  it('keeps reading routes after a regular expression', async () => {
+    const dir = workspace({
+      'src/app.routes.ts': [
+        "const isId = /^[a-z']+$/;",
+        'export const routes = [{ path: 1, component: Home }];'.replace('1', "'home'"),
+      ].join('\n'),
+    });
+    const routes = await getRoutes.setup({ cwd: dir } as never).handler();
+    expect(routes.map((r) => r.path)).toEqual(['home']);
+  });
+
+  it('reports the line of a match without rescanning the file', () => {
+    const at = lineCounter('a\nb\nc');
+    expect([at(0), at(2), at(4)]).toEqual([1, 2, 3]);
+  });
+});
+
+describe('source roots', () => {
+  it('ignores a root that points outside the workspace', () => {
+    const dir = workspace({ 'src/a.ts': '' }, { projects: { escape: { sourceRoot: '../..' } } });
+    expect(sourceRoots(dir)).toEqual([join(dir, 'src')]);
+  });
+
+  it('ignores a root that points at a generated directory', () => {
+    const dir = workspace(
+      { 'src/a.ts': '', 'node_modules/pkg/a.ts': '' },
+      { projects: { bad: { sourceRoot: 'node_modules' } } },
+    );
+    expect(sourceRoots(dir)).toEqual([join(dir, 'src')]);
+  });
+
+  it('drops a root nested inside another so nothing is reported twice', async () => {
+    const dir = workspace(
+      {
+        'src/lib/src/widget.ts':
+          "@Component({ selector: 'lib-x', template: '' }) export class X {}",
+      },
+      { projects: { app: { sourceRoot: 'src' }, lib: { sourceRoot: 'src/lib/src' } } },
+    );
+    expect(sourceRoots(dir)).toEqual([join(dir, 'src')]);
+    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(components.map((c) => c.selector)).toEqual(['lib-x']);
+  });
+
+  it('scans nothing rather than the whole directory when no source root exists', () => {
+    const dir = workspace({ 'lib/a.ts': '' });
+    expect(sourceRoots(dir)).toEqual([]);
+  });
+});
+
+describe('component metadata', () => {
+  it('reads standalone from the component own decorator', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        'const legacyMeta = { standalone: false };',
+        "@Component({ selector: 'app-modern', template: '' })",
+        'export class Modern {}',
+        "@Component({ selector: 'app-legacy', template: '', standalone: false })",
+        'export class Legacy {}',
+      ].join('\n'),
+    });
+    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(components.map((c) => [c.selector, c.isStandalone])).toEqual([
+      ['app-modern', true],
+      ['app-legacy', false],
+    ]);
+  });
+});
+
+describe('matchDelimiter', () => {
+  it('does not count brackets inside a regex literal', () => {
+    const code = 'providers: [{ provide: T, useValue: /\\[/ }, Real]\nconst after = [Alpha];';
+    const open = code.indexOf('[');
+    expect(code.slice(open, matchDelimiter(code, open, '[', ']') + 1)).toBe(
+      '[{ provide: T, useValue: /\\[/ }, Real]',
+    );
+  });
+
+  it('stays linear when every component holds an unbalanced regex', async () => {
+    const files = Array.from(
+      { length: 400 },
+      (_, i) =>
+        `@Component({ selector: 'c${i}', providers: [{ provide: T${i}, useValue: /\\[/ }, Real${i}] })\nexport class C${i} {}`,
+    ).join('\n');
+    const dir = workspace({ 'src/a.ts': files });
+    const providers = await getProviders.setup({ cwd: dir } as never).handler();
+    expect(providers).toHaveLength(800);
+  });
+});

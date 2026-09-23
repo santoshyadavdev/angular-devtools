@@ -6,6 +6,77 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script>
+      // Applied before first paint: pages are prerendered, so waiting for the
+      // bundle would show the wrong theme and then swap it.
+      try {
+        var stored = localStorage.getItem('ng-devtools-demo-theme');
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.dataset.theme = stored;
+        }
+      } catch (e) {}
+    </script>
+    <style>
+      /* Inline and render blocking, so a stored or system dark theme applies
+         to the very first paint. */
+      /* Follows the system, unless the page asks for a theme explicitly. */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          color-scheme: dark;
+
+          --ink: #e8e8ed;
+          --muted: #9ca3af;
+          --line: #2a2a31;
+          --line-strong: #63636e;
+          --subtle: #1c1c22;
+          --surface: #16161b;
+          --page: #0c0c10;
+
+          --brand: #ff6b85;
+          --brand-strong: #ff97a9;
+          --brand-ink: #16161b;
+          --ng-devtools-title: #ff6b85;
+          --brand-soft: #3a1220;
+
+          --ok-soft: #0f2e22;
+          --ok-ink: #6ee7b7;
+          --danger-soft: #3b1d1d;
+          --danger-ink: #fca5a5;
+
+          --shadow: rgba(0, 0, 0, 0.4);
+        }
+      }
+
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+
+        --ink: #e8e8ed;
+        --muted: #9ca3af;
+        --line: #2a2a31;
+        --line-strong: #63636e;
+        --subtle: #1c1c22;
+        --surface: #16161b;
+        --page: #0c0c10;
+
+        --brand: #ff6b85;
+        --brand-strong: #ff97a9;
+        --brand-ink: #16161b;
+        --brand-soft: #3a1220;
+
+        --ok-soft: #0f2e22;
+        --ok-ink: #6ee7b7;
+        --danger-soft: #3b1d1d;
+        --danger-ink: #fca5a5;
+
+        --shadow: rgba(0, 0, 0, 0.4);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+    </style>
   </head>
   <body>
     <app-root></app-root>

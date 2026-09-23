@@ -1,1 +1,100 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* The dark palette lives in index.html, inline in the head: the build defers
+   this stylesheet, so a dark-theme visitor would otherwise see the light one
+   paint first. */
+
+:root {
+  color-scheme: light;
+
+  --ink: #111827;
+  --muted: #656c79;
+  --line: #e5e7eb;
+  --line-strong: #8b9099;
+  --subtle: #f3f4f6;
+  --surface: #fff;
+  --page: #fafafa;
+
+  /* Angular red, from the warm end of the logo gradient. */
+  --brand: #cc0033;
+  --brand-strong: #a30028;
+  /* Text on a --brand background. */
+  --brand-ink: #fff;
+  --brand-soft: #ffe3e9;
+
+  --ok-soft: #d1fae5;
+  --ok-ink: #065f46;
+  --danger-soft: #fee2e2;
+  --danger-ink: #991b1b;
+
+  --shadow: rgba(0, 0, 0, 0.04);
+
+  /* Themes the devtools launcher, which reads these through its shadow root. */
+  --ng-devtools-accent: var(--angular-gradient);
+  --ng-devtools-accent-hover: var(--angular-gradient);
+  /* The popup chrome is dark in both themes, so this stays light. */
+  --ng-devtools-title: #ff6b85;
+  --ng-devtools-accent-ink: #fff;
+
+  /* The Angular logo gradient, taken from the wordmark on angular.dev. */
+  --angular-gradient: linear-gradient(
+    92deg,
+    #e40035 0%,
+    #f60a48 24%,
+    #f20755 35.2%,
+    #dc087d 49.4%,
+    #9717e7 74.5%,
+    #6c00f5 100%
+  );
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

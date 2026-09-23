@@ -62,7 +62,7 @@ import type { DevframeRpcClient } from 'devframe/client';
       transition: border-color 0.15s;
     }
     .card.clickable:hover {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     h3 {
       font-size: 13px;
@@ -87,7 +87,7 @@ import type { DevframeRpcClient } from 'devframe/client';
     .big {
       font-size: 36px;
       font-weight: 700;
-      color: #a78bfa;
+      color: var(--accent);
     }
     .sub {
       font-size: 13px;

@@ -189,7 +189,7 @@ const KIND_COLORS: Record<string, string> = {
       outline: none;
     }
     input:focus {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .toggle-group {
       display: flex;
@@ -371,7 +371,7 @@ const KIND_COLORS: Record<string, string> = {
       border-color: #3f3f46;
     }
     .action-card.selected {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .action-type {
       font-family: monospace;
@@ -385,7 +385,7 @@ const KIND_COLORS: Record<string, string> = {
     .detail-panel {
       margin-top: 16px;
       background: #18181b;
-      border: 1px solid #a78bfa;
+      border: 1px solid var(--accent);
       border-radius: 10px;
       padding: 16px;
     }

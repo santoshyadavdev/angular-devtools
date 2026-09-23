@@ -6,7 +6,7 @@ import { Component } from '@angular/core';
     <section>
       <h1>About Us</h1>
       <p>
-        Angular DevTools — inspect components, signals, DI, and routes in any Angular application.
+        Angular DevTools inspects components, signals, DI and routes in any Angular application.
       </p>
     </section>
   `,

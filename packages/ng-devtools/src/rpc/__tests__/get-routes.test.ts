@@ -1,15 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { fixtureDir } from './fixture-dir.ts';
+import { describe, expect, it } from 'vitest';
 import { getRoutes } from '../get-routes.ts';
 
-let dir: string;
-
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
 async function routesFor(source: string) {
-  dir = mkdtempSync(join(tmpdir(), 'ng-devtools-routes-'));
+  const dir = fixtureDir('ng-devtools-routes-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'app.routes.ts'), source);
   const { handler } = getRoutes.setup({ cwd: dir } as never);
@@ -150,6 +146,17 @@ describe('get-routes', () => {
       export class AppRoutingModule {}`,
     );
     expect(routes.map((r) => [r.path, r.component])).toEqual([['home', 'HomeComponent']]);
+  });
+
+  it('flags a lazily loaded child route configuration', async () => {
+    const routes = await routesFor(`[
+      { path: 'admin', loadChildren: () => import('./admin/routes').then((m) => m.adminRoutes) },
+      { path: 'about', component: AboutComponent },
+    ]`);
+    expect(routes.map((r) => [r.path, r.hasChildren])).toEqual([
+      ['admin', true],
+      ['about', false],
+    ]);
   });
 
   it('only flags children on the route that has them', async () => {

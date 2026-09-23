@@ -19,7 +19,15 @@ import { Component, signal } from '@angular/core';
     }
     button {
       padding: 8px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
       cursor: pointer;
+    }
+    button:hover {
+      border-color: var(--brand);
+      color: var(--brand);
     }
   `,
 })

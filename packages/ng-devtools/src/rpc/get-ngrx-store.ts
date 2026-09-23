@@ -1,7 +1,15 @@
 import { defineRpcFunction } from 'devframe';
 import * as v from 'valibot';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { describable } from './agent-schema.ts';
+import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import {
+  IGNORED_DIRS,
+  lineCounter,
+  maskStrings,
+  sourceRoots,
+  stripComments,
+} from './source-scan.ts';
 
 const NgrxStoreEntrySchema = v.object({
   name: v.string(),
@@ -26,14 +34,14 @@ export const getNgrxStore = defineRpcFunction({
   type: 'query',
   jsonSerializable: true,
   args: [],
-  returns: v.array(NgrxStoreEntrySchema),
+  returns: describable(v.array(NgrxStoreEntrySchema)),
   agent: {
     description:
       'Scan source files for NgRx store patterns: actions, reducers, effects, selectors, features, and store setup. Returns name, kind, file, and line number. Call this to understand the NgRx state management architecture.',
     title: 'List NgRx store entries from source',
   },
   setup: (ctx) => ({
-    handler: async () => scanNgrxStore(join(ctx.cwd, 'src'), ctx.cwd),
+    handler: async () => scanNgrxStore(ctx.cwd),
   }),
 });
 
@@ -89,9 +97,9 @@ const NGRX_PATTERNS: { pattern: RegExp; kind: NgrxStoreEntry['kind'] }[] = [
   { pattern: /(\w+)\s*:\s*signalMethod\s*[<(]/g, kind: 'signal-method' },
 ];
 
-function scanNgrxStore(dir: string, cwd: string): NgrxStoreEntry[] {
+function scanNgrxStore(cwd: string): NgrxStoreEntry[] {
   const entries: NgrxStoreEntry[] = [];
-  walk(dir, cwd, entries);
+  for (const root of sourceRoots(cwd)) walk(root, cwd, entries);
   // Deduplicate by name+file+line (guards against overlapping patterns)
   const seen = new Set<string>();
   return entries.filter((e) => {
@@ -113,8 +121,11 @@ function walk(dir: string, cwd: string, out: NgrxStoreEntry[]) {
   for (const item of items) {
     const full = join(dir, item);
     try {
-      if (statSync(full).isDirectory()) {
-        if (item !== 'node_modules') walk(full, cwd, out);
+      const stats = lstatSync(full);
+      // Not followed: a link can point anywhere, including outside the workspace.
+      if (stats.isSymbolicLink()) continue;
+      if (stats.isDirectory()) {
+        if (!IGNORED_DIRS.has(item.toLowerCase())) walk(full, cwd, out);
         continue;
       }
     } catch {
@@ -124,29 +135,35 @@ function walk(dir: string, cwd: string, out: NgrxStoreEntry[]) {
     if (!item.endsWith('.ts') || item.endsWith('.spec.ts') || item.endsWith('.d.ts')) continue;
 
     try {
-      const content = readFileSync(full, 'utf-8');
+      const raw = readFileSync(full, 'utf-8');
+      // The gate runs on the real text: an import specifier is a string, so a
+      // masked copy would hide the very marker it looks for.
 
       // Quick check: skip files that don't reference ngrx
       if (
-        !content.includes('@ngrx/') &&
-        !content.includes('createAction') &&
-        !content.includes('createReducer') &&
-        !content.includes('createEffect') &&
-        !content.includes('createSelector') &&
-        !content.includes('createFeature') &&
-        !content.includes('signalStore') &&
-        !content.includes('signalState')
+        !raw.includes('@ngrx/') &&
+        !raw.includes('createAction') &&
+        !raw.includes('createReducer') &&
+        !raw.includes('createEffect') &&
+        !raw.includes('createSelector') &&
+        !raw.includes('createFeature') &&
+        !raw.includes('signalStore') &&
+        !raw.includes('signalState')
       ) {
         continue;
       }
 
+      // Comments and strings are not code: a commented out store, or a call
+      // quoted in a template, is not part of the app.
+      const content = maskStrings(stripComments(raw));
+      const lineAt = lineCounter(content);
       const relPath = relative(cwd, full);
 
       for (const { pattern, kind } of NGRX_PATTERNS) {
         pattern.lastIndex = 0;
         let match: RegExpExecArray | null;
         while ((match = pattern.exec(content)) !== null) {
-          const lineNum = content.substring(0, match.index).split('\n').length;
+          const lineNum = lineAt(match.index);
           const name = match[1];
 
           // For StoreModule/EffectsModule, use the full match as name

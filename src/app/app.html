@@ -1,4 +1,5 @@
-<nav class="navbar">
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="navbar" aria-label="Primary">
   <a class="brand" routerLink="/">Angular DevTools</a>
   <div class="nav-links">
     <a
@@ -9,7 +10,11 @@
       >Home</a
     >
     <a routerLink="/products" routerLinkActive="active" ariaCurrentWhenActive="page">Products</a>
+    <a routerLink="/examples" routerLinkActive="active" ariaCurrentWhenActive="page">Examples</a>
     <a routerLink="/about" routerLinkActive="active" ariaCurrentWhenActive="page">About</a>
   </div>
+  <app-theme-toggle />
 </nav>
-<router-outlet />
+<main id="main" tabindex="-1">
+  <router-outlet />
+</main>

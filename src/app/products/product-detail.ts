@@ -35,7 +35,7 @@ import { ProductStore } from './product.store';
     }
     .back {
       font-size: 14px;
-      color: #7c3aed;
+      color: var(--brand);
       text-decoration: none;
     }
     .back:hover {
@@ -51,46 +51,46 @@ import { ProductStore } from './product.store';
     .price {
       font-size: 24px;
       font-weight: 700;
-      color: #7c3aed;
+      color: var(--brand);
       margin-bottom: 12px;
     }
     .category {
       font-size: 13px;
-      color: #6b7280;
+      color: var(--muted);
       margin-right: 12px;
     }
     .stock {
       font-size: 12px;
       padding: 2px 8px;
       border-radius: 99px;
-      background: #d1fae5;
-      color: #065f46;
+      background: var(--ok-soft);
+      color: var(--ok-ink);
     }
     .stock.out {
-      background: #fee2e2;
-      color: #991b1b;
+      background: var(--danger-soft);
+      color: var(--danger-ink);
     }
     .description {
       margin-top: 16px;
       font-size: 15px;
-      color: #374151;
+      color: var(--ink);
       line-height: 1.6;
     }
     button {
       margin-top: 20px;
       padding: 10px 20px;
-      border: 1px solid #7c3aed;
-      background: #7c3aed;
-      color: #fff;
+      border: 1px solid var(--brand);
+      background: var(--brand);
+      color: var(--brand-ink);
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
     }
     button:hover {
-      background: #6d28d9;
+      background: var(--brand-strong);
     }
     .not-found {
-      color: #6b7280;
+      color: var(--muted);
       padding: 40px 0;
     }
   `,

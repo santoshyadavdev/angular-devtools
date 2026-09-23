@@ -1,15 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { fixtureDir } from './fixture-dir.ts';
+import { describe, expect, it } from 'vitest';
 import { getSignals } from '../get-signals.ts';
 
-let dir: string;
-
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
 async function signalsFor(source: string) {
-  dir = mkdtempSync(join(tmpdir(), 'ng-devtools-signals-'));
+  const dir = fixtureDir('ng-devtools-signals-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'app.ts'), source);
   const { handler } = getSignals.setup({ cwd: dir } as never);

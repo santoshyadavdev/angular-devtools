@@ -114,7 +114,7 @@ interface ProviderEntry {
       outline: none;
     }
     input:focus {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     button {
       padding: 8px 16px;
@@ -148,12 +148,12 @@ interface ProviderEntry {
       transition: border-color 0.15s;
     }
     .component-item:hover {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .selector {
       font-family: monospace;
       font-size: 15px;
-      color: #a78bfa;
+      color: var(--accent);
       font-weight: 600;
     }
     .file {
@@ -178,7 +178,7 @@ interface ProviderEntry {
     }
     .detail h3 {
       font-family: monospace;
-      color: #a78bfa;
+      color: var(--accent);
       margin-bottom: 12px;
     }
     dl {

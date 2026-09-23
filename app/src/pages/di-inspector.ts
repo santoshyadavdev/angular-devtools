@@ -168,7 +168,7 @@ const TYPE_COLORS: Record<string, string> = {
       outline: none;
     }
     input[type='text']:focus {
-      border-color: #a78bfa;
+      border-color: var(--accent);
     }
     .checkbox {
       display: flex;
@@ -209,8 +209,8 @@ const TYPE_COLORS: Record<string, string> = {
       background: #18181b;
     }
     .injector-row.selected {
-      background: #1e1b4b;
-      border-color: #a78bfa;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: var(--accent);
     }
     .type-badge {
       font-size: 10px;
@@ -270,7 +270,7 @@ const TYPE_COLORS: Record<string, string> = {
     }
     .token {
       font-family: monospace;
-      color: #a78bfa;
+      color: var(--accent);
     }
     .source-label {
       font-size: 13px;
