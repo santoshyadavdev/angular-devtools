@@ -110,4 +110,13 @@ class Settings {}`,
       expect.objectContaining({ token: 'ExampleSettings', source: 'settings' }),
     );
   });
+
+  it('reads the stable zoneless and check-no-changes providers', async () => {
+    const providers = await providersFor(`
+      export const appConfig = {
+        providers: [provideZonelessChangeDetection(), provideCheckNoChangesConfig({ exhaustive: true })],
+      };
+    `);
+    expect(providers.map((p) => p.token)).toEqual(['ChangeDetection (zoneless)', 'CheckNoChanges']);
+  });
 });
