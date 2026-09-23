@@ -16,6 +16,20 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
+  it('should move focus to main without leaving the route', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    document.body.appendChild(compiled);
+    const link = compiled.querySelector<HTMLAnchorElement>('.skip-link')!;
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+    // `<base href="/">` would turn a bare `#main` into a navigation home.
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement?.id).toBe('main');
+    compiled.remove();
+  });
+
   it('should render the nav links', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();

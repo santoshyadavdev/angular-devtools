@@ -20,7 +20,12 @@ export class App {
     const main = document.getElementById('main');
     if (!main) return;
     event.preventDefault();
-    main.focus();
-    main.scrollIntoView();
+    // Focusing scrolls on its own, and the navbar is sticky: it wraps on
+    // narrow viewports and grows again with the text size, so its height is
+    // measured rather than assumed and the scroll is done here.
+    main.focus({ preventScroll: true });
+    const navbar = document.querySelector('.navbar');
+    const offset = navbar ? navbar.getBoundingClientRect().height : 0;
+    window.scrollTo({ top: Math.max(0, main.offsetTop - offset) });
   }
 }
