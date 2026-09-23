@@ -185,13 +185,25 @@ function blank(text: string): string {
 }
 
 /** A class body, with the selector of the decorator that precedes it. */
+/**
+ * A single line type annotation between a member name and its `=`. A top level
+ * comma ends it, so `constructor(label: string, count = signal(0))` declares
+ * `count` rather than swallowing the parameter list into `label`'s annotation.
+ * Commas inside a generic argument list are still part of the annotation.
+ */
+export const ANNOTATION = String.raw`(?::(?:[^=;\n,<]|=>|<[^;\n]*?>){0,120})?`;
+
 export interface ClassScope {
   start: number;
   end: number;
   component?: string;
+  /** Which of the two decorators it carries, when it carries one. */
+  kind?: 'component' | 'directive';
+  /** That decorator's argument list, parentheses included. */
+  decoratorArgs?: string;
 }
 
-const DECORATOR = /@(?:Component|Directive)\s*\(/g;
+const DECORATOR = /@(Component|Directive)\s*\(/g;
 
 /**
  * The span of every class in the file, each with the selector of the
@@ -211,10 +223,7 @@ export function classScopes(code: string, source: string): ClassScope[] {
     scopes.push({
       start: match.index,
       end,
-      component: decoratorSelector(
-        code.slice(previousEnd, match.index),
-        source.slice(previousEnd, match.index),
-      ),
+      ...decoratorOf(code.slice(previousEnd, match.index), source.slice(previousEnd, match.index)),
     });
     previousEnd = end;
     declaration.lastIndex = end;
@@ -246,15 +255,31 @@ function classBodyStart(code: string, from: number): number {
  * written inside a template can be picked up, and only the value is read from
  * the unmasked copy, where it survives.
  */
-function decoratorSelector(code: string, source: string): string | undefined {
+/**
+ * The `@Component` or `@Directive` that precedes a class, read once. Matching
+ * the decorator name with a word boundary keeps `@ComponentMeta()` from being
+ * taken for `@Component`, and returning its arguments here means no caller has
+ * to look the decorator up a second time and disagree about which one it is.
+ */
+function decoratorOf(
+  code: string,
+  source: string,
+): Pick<ClassScope, 'component' | 'kind' | 'decoratorArgs'> {
   let open = -1;
-  for (const match of code.matchAll(DECORATOR)) open = match.index + match[0].length - 1;
-  if (open === -1) return undefined;
-  const args = code.slice(open, matchDelimiter(code, open, '(', ')'));
+  let kind: 'component' | 'directive' | undefined;
+  for (const match of code.matchAll(DECORATOR)) {
+    open = match.index + match[0].length - 1;
+    kind = match[1] === 'Directive' ? 'directive' : 'component';
+  }
+  if (open === -1) return {};
+
+  const close = matchDelimiter(code, open, '(', ')');
+  const args = code.slice(open, close);
+  const decoratorArgs = code.slice(open, close + 1);
   const key = /\bselector\s*:\s*['"`]/.exec(args);
-  if (!key) return undefined;
+  if (!key) return { kind, decoratorArgs };
   const quote = open + key.index + key[0].length - 1;
-  return source.slice(quote + 1, skipString(source, quote));
+  return { component: source.slice(quote + 1, skipString(source, quote)), kind, decoratorArgs };
 }
 
 /** Index of the delimiter that closes the one at `open`. */
@@ -299,6 +324,8 @@ export function sourceRoots(cwd: string): string[] {
   // containment check and have its files reported as if they were in here.
   const root = realPath(cwd);
   const seen = new Set<string>();
+  // Keyed by real path, so nesting is judged on where a root actually points.
+  const realOf = new Map<string, string>();
   const usable = [...new Set(roots)].filter((dir) => {
     const real = realPath(dir);
     if (seen.has(real)) return false;
@@ -316,6 +343,7 @@ export function sourceRoots(cwd: string): string[] {
       return false;
     }
     seen.add(real);
+    realOf.set(dir, real);
     return true;
   });
 
@@ -326,12 +354,17 @@ export function sourceRoots(cwd: string): string[] {
   // because `-` is below `/`. That invariant keeps this pass linear.
   const kept: string[] = [];
   let cover: string | undefined;
-  for (const sorted of usable.map((dir) => dir + sep).sort()) {
-    const dir = sorted.slice(0, -sep.length);
-    if (cover !== undefined && !escapes(relative(cover, dir))) {
+  // Sorted on the real path, so a `src` that links to `apps/web` is seen to
+  // contain a root declared as `apps/web/src`. The unresolved path is what is
+  // returned, so the files keep the names the project uses for them.
+  const order = usable
+    .map((dir) => ({ dir, real: realOf.get(dir) ?? dir }))
+    .sort((a, b) => (a.real + sep < b.real + sep ? -1 : a.real === b.real ? 0 : 1));
+  for (const { dir, real } of order) {
+    if (cover !== undefined && !escapes(relative(cover, real))) {
       // The walk refuses to descend into a generated directory, so a project
       // declared below one is only reachable by starting there.
-      const crosses = relative(cover, dir)
+      const crosses = relative(cover, real)
         .split(/[\\/]/)
         .some((part) => IGNORED_DIRS.has(part.toLowerCase()));
       if (!crosses) continue;
@@ -339,7 +372,7 @@ export function sourceRoots(cwd: string): string[] {
       continue;
     }
     kept.push(dir);
-    cover = dir;
+    cover = real;
   }
   return kept;
 }

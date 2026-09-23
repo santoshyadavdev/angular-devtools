@@ -185,7 +185,7 @@ const ngDevtools = defineDevframe({
       handler: async (args: { selector: string }) => {
         if (!componentTree.value().nodes.length) {
           return {
-            markdown: `No page is connected, so nothing was highlighted. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
+            markdown: `No component tree has been reported, so nothing was highlighted. This is what a page that has never connected reports, and also what a connected page reports when its components are not readable. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
           };
         }
         await ctx.rpc.invokeLocal('ng-devtools:select-component' as any, args.selector);
@@ -244,20 +244,21 @@ const ngDevtools = defineDevframe({
         properties: {
           selector: {
             type: 'string',
-            description: 'CSS selector of the component to inspect, e.g. app-root.',
+            description:
+              'Optional CSS selector, e.g. app-root. It only labels the answer: the page reports the whole tree either way.',
           },
         },
-        required: ['selector'],
       },
-      handler: async (args: { selector: string }) => {
+      handler: async (args: { selector?: string }) => {
         const roots = injectorTreeState.value().roots;
         if (!roots.length) {
           return {
             markdown: `No injector data available. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`,
           };
         }
+        const scope = args.selector ? `, not filtered to \`${args.selector}\`` : '';
         return {
-          markdown: `This is the injector tree for the whole page, not filtered to \`${args.selector}\`:\n\n${JSON.stringify(roots, null, 2)}`,
+          markdown: `This is the injector tree for the whole page${scope}:\n\n${JSON.stringify(roots, null, 2)}`,
         };
       },
     });

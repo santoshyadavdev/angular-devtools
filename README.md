@@ -138,18 +138,23 @@ See the [Chrome Extension](#chrome-devtools-extension-1) section below for how t
 
 ### Browser Overlay
 
-The overlay runs inside the user's Angular page and collects live component, signal, DI, and NgRx data:
+The overlay runs inside the user's Angular page and collects live component, signal, DI, and NgRx data. Importing the module starts it, so in most apps that import is all that is needed:
+
+```ts
+import '@santoshyadavdev/ng-devtools/overlay';
+```
+
+It looks for the devframe connection next to the page and then at
+`/__ng-devtools/`.
+
+`initOverlay` is exported for a devtools mounted somewhere else. Importing the
+module has already started an overlay on the default URLs by then, so dispose of
+that one before starting another, or the page ends up with two connections and
+two polling intervals:
 
 ```ts
 import { initOverlay } from '@santoshyadavdev/ng-devtools/overlay';
 
-const dispose = await initOverlay();
-```
-
-It looks for the devframe connection next to the page and then at
-`/__ng-devtools/`. Pass `baseURL` when it is mounted somewhere else:
-
-```ts
 const dispose = await initOverlay({ baseURL: '/__my-devtools/' });
 ```
 

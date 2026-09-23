@@ -122,6 +122,9 @@ export class SignalsExample {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   protected readonly settings = inject(ExampleSettings);
 
+  // Restored before `persist` runs, since an effect runs at least once and
+  // would otherwise write the initial value over the stored one. The server
+  // and the first client render both use the default, so hydration matches.
   protected readonly count = signal(1);
   protected readonly doubled = computed(() => this.count() * 2);
 
@@ -165,12 +168,32 @@ export class SignalsExample {
   private readonly persist = effect(() => {
     const count = this.count();
     if (!this.isBrowser) return;
+    if (!this.restored) {
+      this.restored = true;
+      const stored = this.readStoredCount();
+      if (stored !== undefined && stored !== count) {
+        this.count.set(stored);
+        return;
+      }
+    }
     try {
       sessionStorage.setItem('ng-devtools-examples-count', String(count));
     } catch {
       // storage can be unavailable; the example does not depend on it
     }
   });
+
+  private restored = false;
+
+  private readStoredCount(): number | undefined {
+    try {
+      const raw = sessionStorage.getItem('ng-devtools-examples-count');
+      const value = Number(raw);
+      return raw !== null && Number.isFinite(value) ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
 
   add(step: number) {
     this.count.update((value) => value + step);

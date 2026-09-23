@@ -4,6 +4,7 @@ import { describable } from './agent-schema.ts';
 import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
+  ANNOTATION,
   IGNORED_DIRS,
   classScopes,
   lineCounter,
@@ -66,7 +67,9 @@ const KINDS: Record<string, string> = {
 // `this.` prefix is a declaration too, but any other member assignment, as in
 // `store.count = signal(0)`, is not, hence the lookbehind.
 const SIGNAL_CALL = new RegExp(
-  String.raw`(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::(?:[^=;\n]|=>){0,120})?=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
+  String.raw`(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*` +
+    ANNOTATION +
+    String.raw`=\s*(${Object.keys(KINDS).join('|')})(\.required)?\s*[<(]`,
   'g',
 );
 

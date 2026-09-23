@@ -19,9 +19,11 @@ async function boot() {
 }
 
 describe('agent tools', () => {
-  it('say so when no page is connected', async () => {
+  it('say so when nothing has been reported', async () => {
     const { call } = await boot();
-    expect(await call('highlight', 'app-root')).toMatch(/no page is connected/i);
+    // Worded after the data, not the connection: an empty tree is what both a
+    // page that never connected and a page with no readable components send.
+    expect(await call('highlight', 'app-root')).toMatch(/no component tree has been reported/i);
     expect(await call('inspect-signals', 'app-root')).toMatch(/no signal graph/i);
     expect(await call('inspect-providers', 'app-root')).toMatch(/no injector data/i);
   });

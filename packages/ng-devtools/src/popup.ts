@@ -328,8 +328,20 @@ export function createDevtoolsPopup() {
 
   // Scoped to the popup's own chrome: a listener on the window would take
   // Escape away from the host application.
-  popupRoot.addEventListener('keydown', (event) => {
+  const onEscape = (event: Event) => {
     if ((event as KeyboardEvent).key === 'Escape' && isOpen) togglePanel();
+  };
+  popupRoot.addEventListener('keydown', onEscape);
+
+  // A key pressed inside the frame is delivered to the frame's own document
+  // and never reaches the host, so Escape would not close the panel while the
+  // devtools have focus. The frame is same origin, so it can be listened to.
+  iframe.addEventListener('load', () => {
+    try {
+      iframe.contentDocument?.addEventListener('keydown', onEscape);
+    } catch {
+      // a cross origin frame cannot be reached, and Escape stays host only
+    }
   });
 
   function applyDock() {

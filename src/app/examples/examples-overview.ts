@@ -45,7 +45,7 @@ interface ExampleLink {
     .grid {
       display: grid;
       gap: 24px;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
       margin: 0;
       padding: 0;
       list-style: none;

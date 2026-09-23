@@ -2,6 +2,7 @@ import { defineRpcFunction } from 'devframe';
 import {
   IGNORED_DIRS,
   lineCounter,
+  maskRegexes,
   maskStrings,
   matchDelimiter,
   sourceRoots,
@@ -111,9 +112,10 @@ function walk(dir: string, cwd: string, out: ProviderEntry[]) {
 
     try {
       const source = stripComments(readFileSync(full, 'utf-8'));
-      // Identifiers quoted in a string are not providers, so match against
-      // masked source. Masking keeps the length, so offsets still line up.
-      const code = maskStrings(source);
+      // Identifiers quoted in a string, or spelled out in a pattern, are not
+      // providers, so match against masked source. Masking keeps the length,
+      // so offsets still line up.
+      const code = maskRegexes(maskStrings(source));
       const relPath = relative(cwd, full);
       const lineAt = lineCounter(code);
 
@@ -135,7 +137,7 @@ function walk(dir: string, cwd: string, out: ProviderEntry[]) {
           after = close + 1;
         }
 
-        DECLARATION.lastIndex = after;
+        DECLARATION.lastIndex = skipDecorators(code, after);
         const declaration = DECLARATION.exec(code);
         if (!declaration) continue;
 
@@ -146,8 +148,13 @@ function walk(dir: string, cwd: string, out: ProviderEntry[]) {
           file: relPath,
           line: lineAt(at),
           // @Service defaults to providedIn: 'root'
+          // `providedIn` takes `'root'`, `'platform'`, `'any'`, or a class
+          // such as `providedIn: FeatureModule`.
           providedIn:
-            /providedIn\s*:\s*['"`](\w+)['"`]/.exec(args)?.[1] ?? (isService ? 'root' : undefined),
+            /providedIn\s*:\s*(?:['"`](\w+)['"`]|([A-Za-z_$][\w$]*))/
+              .exec(args)
+              ?.slice(1)
+              .find(Boolean) ?? (isService ? 'root' : undefined),
           type: 'injectable',
         });
       }
@@ -215,6 +222,27 @@ function walk(dir: string, cwd: string, out: ProviderEntry[]) {
       }
     } catch {
       // skip
+    }
+  }
+}
+
+/**
+ * Past any further decorators on the same declaration. TypeScript allows more
+ * than one, and the sticky `DECLARATION` match would otherwise stop at the
+ * first of them and miss the class.
+ */
+function skipDecorators(code: string, from: number): number {
+  let at = from;
+  for (;;) {
+    const next = /\S/.exec(code.slice(at));
+    if (!next || code[at + next.index] !== '@') return at;
+    const nameEnd =
+      at + next.index + 1 + (/^[\w$]*/.exec(code.slice(at + next.index + 1))?.[0].length ?? 0);
+    const paren = /\S/.exec(code.slice(nameEnd));
+    if (paren && code[nameEnd + paren.index] === '(') {
+      at = matchDelimiter(code, nameEnd + paren.index, '(', ')') + 1;
+    } else {
+      at = nameEnd;
     }
   }
 }

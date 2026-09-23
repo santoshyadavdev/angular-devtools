@@ -86,3 +86,14 @@
 .skip-link:focus {
   left: 0;
 }
+
+/* The navbar is sticky, so anchoring to main would put the heading under it. */
+#main {
+  scroll-margin-top: 64px;
+}
+
+@media (max-width: 700px) {
+  #main {
+    scroll-margin-top: 104px;
+  }
+}

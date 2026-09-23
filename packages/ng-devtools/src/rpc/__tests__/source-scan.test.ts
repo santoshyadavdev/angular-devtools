@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
 import { describe, expect, it } from 'vitest';
@@ -239,5 +239,74 @@ describe('second review pass', () => {
       '{\n  // c\n  "projects": { "a": { "sourceRoot": "apps/x,}/src" }, },\n}',
     );
     expect(sourceRoots(dir).map((r) => relative(dir, r))).toEqual([join('apps', 'x,}', 'src')]);
+  });
+});
+
+describe('third review pass', () => {
+  it('does not read a decorator with a longer name as @Component', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        "@Component({ selector: 'app-x', template: '', standalone: false })",
+        '@ComponentMeta()',
+        'export class X {}',
+      ].join('\n'),
+    });
+    const [component] = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(component.isStandalone).toBe(false);
+  });
+
+  it('does not report a provider spelled out in a regex literal', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        'const re = /settings=inject(FakeService)/;',
+        "@Injectable({ providedIn: 'root' })",
+        'export class Real {}',
+      ].join('\n'),
+    });
+    const found = await getProviders.setup({ cwd: dir } as never).handler();
+    expect(found.map((p) => p.token)).toEqual(['Real']);
+  });
+
+  it('finds a service behind a second decorator', async () => {
+    const dir = workspace({
+      'src/a.ts': "@Injectable({ providedIn: 'root' })\n@Trace()\nexport class Api {}",
+    });
+    const found = await getProviders.setup({ cwd: dir } as never).handler();
+    expect(found.map((p) => p.token)).toContain('Api');
+  });
+
+  it('reads providedIn given as a class', async () => {
+    const dir = workspace({
+      'src/a.ts': '@Injectable({ providedIn: FeatureModule })\nexport class Api {}',
+    });
+    const [provider] = await getProviders.setup({ cwd: dir } as never).handler();
+    expect(provider.providedIn).toBe('FeatureModule');
+  });
+
+  it('stops a type annotation at a parameter boundary', async () => {
+    const dir = workspace({
+      'src/a.ts': 'class C { constructor(label: string, count = signal(0)) {} }',
+    });
+    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    expect(found.map((s) => s.name)).toEqual(['count']);
+  });
+
+  it('still reads an annotation holding a generic with a comma', async () => {
+    const dir = workspace({
+      'src/a.ts': 'class C { totals: Signal<Record<string, number>> = signal({}); }',
+    });
+    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    expect(found.map((s) => s.name)).toContain('totals');
+  });
+
+  it('prunes a root reached through a symlinked source root', () => {
+    const dir = fixtureDir('ng-devtools-link-');
+    mkdirSync(join(dir, 'apps', 'web', 'src'), { recursive: true });
+    symlinkSync(join(dir, 'apps', 'web'), join(dir, 'src'));
+    writeFileSync(
+      join(dir, 'angular.json'),
+      JSON.stringify({ projects: { a: { sourceRoot: 'apps/web/src' } } }),
+    );
+    expect(sourceRoots(dir)).toHaveLength(1);
   });
 });

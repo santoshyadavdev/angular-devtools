@@ -4,10 +4,10 @@ import { describable } from './agent-schema.ts';
 import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
+  ANNOTATION,
   IGNORED_DIRS,
   classScopes,
   maskStrings,
-  matchDelimiter,
   sourceRoots,
   stripComments,
 } from './source-scan.ts';
@@ -92,17 +92,16 @@ function componentsIn(content: string, relPath: string): ComponentInfo[] {
 
   const components: ComponentInfo[] = [];
   const scopes = classScopes(code, source);
-  scopes.forEach((scope, i) => {
+  scopes.forEach((scope) => {
     if (!scope.component) return;
     const body = code.slice(scope.start, scope.end);
-    const decorator = precedingDecorator(code, scopes[i - 1]?.end ?? 0, scope.start);
     components.push({
       selector: scope.component,
-      kind: decorator.name,
+      kind: scope.kind ?? 'component',
       file: relPath,
       inputs: [...names(body, INPUT), ...names(body, INPUT_DECORATOR)],
       outputs: [...names(body, OUTPUT), ...names(body, OUTPUT_DECORATOR)],
-      isStandalone: !/\bstandalone\s*:\s*false\b/.test(decorator.args),
+      isStandalone: !/\bstandalone\s*:\s*false\b/.test(scope.decoratorArgs ?? ''),
     });
   });
   return components;
@@ -115,9 +114,16 @@ function names(body: string, pattern: RegExp): string[] {
 
 // `name = input(`, `name = input<T>(` and `name = input.required(`, optionally
 // behind a modifier or a type annotation, as in `readonly name: InputSignal<T> =`.
-const INPUT =
-  /(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::[^=;\n]{0,120})?=\s*(?:input|model)(?:\.required)?\s*[<(]/g;
-const OUTPUT = /(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::[^=;\n]{0,120})?=\s*output\s*[<(]/g;
+const INPUT = new RegExp(
+  String.raw`(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*` +
+    ANNOTATION +
+    String.raw`=\s*(?:input|model)(?:\.required)?\s*[<(]`,
+  'g',
+);
+const OUTPUT = new RegExp(
+  String.raw`(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*` + ANNOTATION + String.raw`=\s*output\s*[<(]`,
+  'g',
+);
 // A member can carry modifiers and an accessor keyword before its name:
 // `@Input() set value(v)` declares `value`, not `set`.
 const MEMBER_PREFIX = String.raw`(?:(?:readonly|public|private|protected|override|declare|static|abstract|get|set|async)\s+)*`;
@@ -129,25 +135,3 @@ const OUTPUT_DECORATOR = new RegExp(
   String.raw`@Output\([^)]*\)\s+` + MEMBER_PREFIX + String.raw`([$\w]+)`,
   'g',
 );
-
-/**
- * The `@Component`/`@Directive` that precedes a class, with its own argument
- * list, so a `standalone: false` written anywhere else between two classes is
- * not read as this one's.
- */
-function precedingDecorator(
-  code: string,
-  from: number,
-  until: number,
-): { name: 'component' | 'directive'; args: string } {
-  const region = code.slice(from, until);
-  const component = region.lastIndexOf('@Component');
-  const directive = region.lastIndexOf('@Directive');
-  const at = Math.max(component, directive);
-  const name = directive > component ? 'directive' : 'component';
-  if (at === -1) return { name, args: '' };
-
-  const open = code.indexOf('(', from + at);
-  if (open === -1 || open >= until) return { name, args: '' };
-  return { name, args: code.slice(open, matchDelimiter(code, open, '(', ')') + 1) };
-}

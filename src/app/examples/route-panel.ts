@@ -39,13 +39,19 @@ export class RoutePanel {
   private readonly route = inject(ActivatedRoute);
 
   private readonly snapshot = toSignal(this.route.data, { initialValue: {} as Data });
+  // `route.url` only carries this level's segments, so a child route would
+  // render `/summary` for `/examples/routes/summary`.
   private readonly segments = toSignal(this.route.url, { initialValue: [] });
+  private readonly fullPath = this.route.pathFromRoot
+    .map((route) => route.snapshot.url.map((segment) => segment.path).join('/'))
+    .filter(Boolean)
+    .join('/');
 
   readonly title = computed(() => String(this.snapshot()['title'] ?? 'Route'));
-  readonly path = computed(() =>
-    this.segments()
-      .map((segment) => segment.path)
-      .join('/'),
-  );
+  readonly path = computed(() => {
+    // Read so the panel still updates when this level's segments change.
+    this.segments();
+    return this.fullPath;
+  });
   readonly data = computed(() => JSON.stringify(this.snapshot()));
 }
