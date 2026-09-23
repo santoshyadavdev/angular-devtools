@@ -12,6 +12,7 @@ import {
   maskStrings,
   matchDelimiter,
   sourceRoots,
+  startsRegex,
   stripComments,
 } from '../source-scan.ts';
 
@@ -209,5 +210,34 @@ describe('review regressions', () => {
     });
     const found = await getNgrxStore.setup({ cwd: dir } as never).handler();
     expect(found.map((e) => e.name)).toEqual(['Real']);
+  });
+});
+
+describe('second review pass', () => {
+  it('treats `.of` as a property, so the division is not a regex', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        "const x = object.of / 2 /* @Component({ selector: 'app-fake', template: '' }) class Fake {} */ / 3;",
+        "@Component({ selector: 'app-real', template: '' })",
+        'export class Real {}',
+      ].join('\n'),
+    });
+    const found = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(found.map((c) => c.selector)).toEqual(['app-real']);
+  });
+
+  it('still opens a regex after a keyword', () => {
+    expect(startsRegex('return /re/', 7)).toBe(true);
+    expect(startsRegex('typeof x / 2', 9)).toBe(false);
+  });
+
+  it('keeps a trailing comma sequence that sits inside a path', () => {
+    const dir = fixtureDir('ng-devtools-jsonc2-');
+    mkdirSync(join(dir, 'apps', 'x,}', 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'angular.json'),
+      '{\n  // c\n  "projects": { "a": { "sourceRoot": "apps/x,}/src" }, },\n}',
+    );
+    expect(sourceRoots(dir).map((r) => relative(dir, r))).toEqual([join('apps', 'x,}', 'src')]);
   });
 });

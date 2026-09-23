@@ -28,12 +28,15 @@ export function startsRegex(source: string, at: number): boolean {
     const ch = source[i];
     if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') continue;
     // After a value, `/` divides; after an operator or a keyword, it opens one.
-    // The longest keyword is six characters, and one more is needed for the
-    // `\b` to be evaluated: a bounded window keeps this O(1) per `/` rather
-    // than resting on the engine slicing lazily.
+    // The longest keyword is six characters, and one more is needed to see
+    // what precedes it: a bounded window keeps this O(1) per `/` rather than
+    // resting on the engine slicing lazily. A `.` rules the keyword out, since
+    // `object.of / 2` accesses a property and then divides.
     return (
       !/[\w$)\]]/.test(ch) ||
-      /\b(return|typeof|case|in|of|do|else)$/.test(source.slice(Math.max(0, i - 6), i + 1))
+      /(?:^|[^\w$.])(?:return|typeof|case|in|of|do|else)$/.test(
+        source.slice(Math.max(0, i - 6), i + 1),
+      )
     );
   }
   return true;
@@ -277,9 +280,7 @@ export function sourceRoots(cwd: string): string[] {
   try {
     // The CLI accepts comments and trailing commas in `angular.json`, and a
     // throw here would silently drop every declared project.
-    const workspace = JSON.parse(
-      stripComments(readFileSync(join(cwd, 'angular.json'), 'utf-8')).replace(/,(\s*[}\]])/g, '$1'),
-    );
+    const workspace = JSON.parse(parseJsonc(readFileSync(join(cwd, 'angular.json'), 'utf-8')));
     const projects = workspace?.projects;
     for (const project of Object.values(projects ?? {})) {
       if (!project || typeof project !== 'object') continue;
@@ -361,6 +362,24 @@ export const IGNORED_DIRS = new Set([
   '.turbo',
   '.yarn',
 ]);
+
+/**
+ * JSONC as plain JSON: comments gone and trailing commas dropped. The commas
+ * are located in a masked copy, so a `,}` inside a path stays untouched.
+ */
+function parseJsonc(source: string): string {
+  const text = stripComments(source);
+  const masked = maskStrings(text);
+  const trailing = /,(\s*[}\]])/g;
+  let out = '';
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = trailing.exec(masked)) !== null) {
+    out += text.slice(last, match.index);
+    last = match.index + 1;
+  }
+  return out + text.slice(last);
+}
 
 /**
  * Whether a relative path leaves its base. A plain `startsWith('..')` also
