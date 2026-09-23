@@ -225,7 +225,7 @@ const ngDevtools = defineDevframe({
           };
         }
         const json = JSON.stringify(graph, null, 2);
-        if (graph.componentSelector !== args.selector) {
+        if (graph.componentSelector && graph.componentSelector !== args.selector) {
           return {
             markdown: `No signal graph for \`${args.selector}\`. The live graph covers \`${graph.componentSelector}\`:\n\n${json}`,
           };

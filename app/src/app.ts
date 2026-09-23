@@ -181,12 +181,22 @@ export class App implements OnInit, OnDestroy {
 }
 
 // Chrome extension passes ?baseURL=...; embedded uses /__ng-devtools/; standalone uses default
+function sameOrigin(value: string): boolean {
+  try {
+    return new URL(value, location.href).origin === location.origin;
+  } catch {
+    return false;
+  }
+}
+
 function detectBaseURL(): string | undefined {
   const params = new URLSearchParams(location.search);
   const fromQuery = params.get('baseURL');
   // Same origin only: any page can open this URL, and this value decides where
   // the panel opens its RPC channel.
-  if (fromQuery && new URL(fromQuery, location.href).origin === location.origin) {
+  // `new URL` throws on a malformed value, and this runs before the connection
+  // is made, so an unhandled throw would leave the panel blank.
+  if (fromQuery && sameOrigin(fromQuery)) {
     return fromQuery;
   }
 

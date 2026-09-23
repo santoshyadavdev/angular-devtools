@@ -1,5 +1,8 @@
 import { toStandardJsonSchema } from '@valibot/to-json-schema';
 
+/** The schemas the valibot converter accepts. */
+type Convertible = Parameters<typeof toStandardJsonSchema>[0];
+
 /**
  * Attach a [Standard JSON Schema](https://standardschema.dev/) converter to a
  * valibot schema.
@@ -14,13 +17,13 @@ import { toStandardJsonSchema } from '@valibot/to-json-schema';
  * an array return advertises no output schema at all, since MCP only allows an
  * object there. Either way the response matches what was advertised.
  */
-export function describable<T>(schema: T): T {
-  const described = { ...schema, ...toStandardJsonSchema(schema as never) } as T;
+export function describable<T extends Convertible>(schema: T): T {
+  const described = { ...schema, ...toStandardJsonSchema(schema) } as T;
 
   // Conversion is lazy, and devframe swallows a converter that throws by
   // falling back to a permissive object schema: the very thing this avoids.
   // Converting once here turns that into an error at startup instead.
-  (described as { '~standard': { jsonSchema: { input: (o: unknown) => unknown } } })[
+  (described as unknown as { '~standard': { jsonSchema: { input: (o: unknown) => unknown } } })[
     '~standard'
   ].jsonSchema.input({ target: 'draft-2020-12' });
 

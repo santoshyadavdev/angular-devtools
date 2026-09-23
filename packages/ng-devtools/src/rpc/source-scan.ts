@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 // Helpers shared by the RPC functions that read information out of source
 // files with regular expressions. None of them parse TypeScript; they only do
@@ -28,8 +28,12 @@ export function startsRegex(source: string, at: number): boolean {
     const ch = source[i];
     if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') continue;
     // After a value, `/` divides; after an operator or a keyword, it opens one.
+    // The longest keyword is six characters, and one more is needed for the
+    // `\b` to be evaluated: a bounded window keeps this O(1) per `/` rather
+    // than resting on the engine slicing lazily.
     return (
-      !/[\w$)\]]/.test(ch) || /\b(return|typeof|case|in|of|do|else)$/.test(source.slice(0, i + 1))
+      !/[\w$)\]]/.test(ch) ||
+      /\b(return|typeof|case|in|of|do|else)$/.test(source.slice(Math.max(0, i - 6), i + 1))
     );
   }
   return true;
@@ -93,6 +97,31 @@ export function stripComments(source: string): string {
     } else {
       out += ch;
     }
+  }
+  return out;
+}
+
+/**
+ * Replace the contents of regular expression literals with spaces, keeping the
+ * delimiters and the length. A pattern is not code, so a call spelled out
+ * inside one, as in `/signalStore\(\)/`, must not be reported as a real
+ * declaration. Run it after `maskStrings`, so a `/` inside a string is gone.
+ */
+export function maskRegexes(source: string): string {
+  let out = '';
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (ch !== '/' || !startsRegex(source, i)) {
+      out += ch;
+      continue;
+    }
+    const end = skipRegex(source, i);
+    if (end === i) {
+      out += ch;
+      continue;
+    }
+    out += ch + blank(source.slice(i + 1, end)) + source[end];
+    i = end;
   }
   return out;
 }
@@ -246,7 +275,11 @@ export function matchDelimiter(source: string, open: number, start: string, end:
 export function sourceRoots(cwd: string): string[] {
   const roots: string[] = [];
   try {
-    const workspace = JSON.parse(readFileSync(join(cwd, 'angular.json'), 'utf-8'));
+    // The CLI accepts comments and trailing commas in `angular.json`, and a
+    // throw here would silently drop every declared project.
+    const workspace = JSON.parse(
+      stripComments(readFileSync(join(cwd, 'angular.json'), 'utf-8')).replace(/,(\s*[}\]])/g, '$1'),
+    );
     const projects = workspace?.projects;
     for (const project of Object.values(projects ?? {})) {
       if (!project || typeof project !== 'object') continue;
@@ -271,7 +304,7 @@ export function sourceRoots(cwd: string): string[] {
     const inside = relative(root, real);
     // Must be a strict descendant: `.` resolves to the workspace itself, which
     // would widen every scan to the whole repository.
-    if (!inside || inside.startsWith('..') || isAbsolute(inside)) return false;
+    if (!inside || escapes(inside) || isAbsolute(inside)) return false;
     // A declared `sourceRoot` is deliberate, so a project really rooted at
     // `src/build` is honoured; only dependencies are refused outright.
     const refused = declared.has(dir) ? DEPENDENCY_DIRS : IGNORED_DIRS;
@@ -286,16 +319,18 @@ export function sourceRoots(cwd: string): string[] {
   });
 
   // A root nested inside another would report everything under it twice.
-  // Sorted, a root can only be nested inside the last covering one, so this
-  // stays linear on a workspace with hundreds of projects.
+  // Sorting with a trailing separator puts every descendant of a root in one
+  // block directly after it, so a root can only be nested inside the last
+  // covering one: without it `src-electron` sorts between `src` and `src/lib`,
+  // because `-` is below `/`. That invariant keeps this pass linear.
   const kept: string[] = [];
   let cover: string | undefined;
-  for (const dir of usable.sort()) {
-    const inCover = cover && !relative(cover, dir).startsWith('..');
-    if (inCover) {
+  for (const sorted of usable.map((dir) => dir + sep).sort()) {
+    const dir = sorted.slice(0, -sep.length);
+    if (cover !== undefined && !escapes(relative(cover, dir))) {
       // The walk refuses to descend into a generated directory, so a project
       // declared below one is only reachable by starting there.
-      const crosses = relative(cover!, dir)
+      const crosses = relative(cover, dir)
         .split(/[\\/]/)
         .some((part) => IGNORED_DIRS.has(part.toLowerCase()));
       if (!crosses) continue;
@@ -326,6 +361,14 @@ export const IGNORED_DIRS = new Set([
   '.turbo',
   '.yarn',
 ]);
+
+/**
+ * Whether a relative path leaves its base. A plain `startsWith('..')` also
+ * matches a child named `..foo`, which does not.
+ */
+function escapes(rel: string): boolean {
+  return rel === '..' || rel.startsWith('..' + sep);
+}
 
 /** The path with symlinks resolved, or the path itself when it does not exist. */
 function realPath(path: string): string {

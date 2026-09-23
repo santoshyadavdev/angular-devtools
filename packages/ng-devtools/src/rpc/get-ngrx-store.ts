@@ -6,6 +6,7 @@ import { join, relative } from 'node:path';
 import {
   IGNORED_DIRS,
   lineCounter,
+  maskRegexes,
   maskStrings,
   sourceRoots,
   stripComments,
@@ -153,9 +154,10 @@ function walk(dir: string, cwd: string, out: NgrxStoreEntry[]) {
         continue;
       }
 
-      // Comments and strings are not code: a commented out store, or a call
-      // quoted in a template, is not part of the app.
-      const content = maskStrings(stripComments(raw));
+      // Comments, strings and regex literals are not code: a commented out
+      // store, or a call quoted in a template or a pattern, is not part of
+      // the app.
+      const content = maskRegexes(maskStrings(stripComments(raw)));
       const lineAt = lineCounter(content);
       const relPath = relative(cwd, full);
 

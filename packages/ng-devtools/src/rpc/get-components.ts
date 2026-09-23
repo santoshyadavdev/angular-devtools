@@ -118,8 +118,17 @@ function names(body: string, pattern: RegExp): string[] {
 const INPUT =
   /(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::[^=;\n]{0,120})?=\s*(?:input|model)(?:\.required)?\s*[<(]/g;
 const OUTPUT = /(?<![\w$#.])(?:this\.)?(#?[$\w]+)\s*(?::[^=;\n]{0,120})?=\s*output\s*[<(]/g;
-const INPUT_DECORATOR = /@Input\([^)]*\)\s+(?:readonly\s+)?(\w+)/g;
-const OUTPUT_DECORATOR = /@Output\([^)]*\)\s+(?:readonly\s+)?(\w+)/g;
+// A member can carry modifiers and an accessor keyword before its name:
+// `@Input() set value(v)` declares `value`, not `set`.
+const MEMBER_PREFIX = String.raw`(?:(?:readonly|public|private|protected|override|declare|static|abstract|get|set|async)\s+)*`;
+const INPUT_DECORATOR = new RegExp(
+  String.raw`@Input\([^)]*\)\s+` + MEMBER_PREFIX + String.raw`([$\w]+)`,
+  'g',
+);
+const OUTPUT_DECORATOR = new RegExp(
+  String.raw`@Output\([^)]*\)\s+` + MEMBER_PREFIX + String.raw`([$\w]+)`,
+  'g',
+);
 
 /**
  * The `@Component`/`@Directive` that precedes a class, with its own argument

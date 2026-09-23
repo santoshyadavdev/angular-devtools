@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
 import { describe, expect, it } from 'vitest';
 import { getComponents } from '../get-components.ts';
+import { getNgrxStore } from '../get-ngrx-store.ts';
 import { getProviders } from '../get-providers.ts';
 import { getRoutes } from '../get-routes.ts';
 import { getSignals } from '../get-signals.ts';
@@ -137,5 +138,76 @@ describe('matchDelimiter', () => {
     const dir = workspace({ 'src/a.ts': files });
     const providers = await getProviders.setup({ cwd: dir } as never).handler();
     expect(providers).toHaveLength(800);
+  });
+});
+
+describe('review regressions', () => {
+  it('prunes a nested root even when a sibling sorts between them', () => {
+    const dir = fixtureDir('ng-devtools-nest-');
+    for (const d of ['src', 'src-electron', 'src/lib'])
+      mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(
+      join(dir, 'angular.json'),
+      JSON.stringify({
+        projects: {
+          a: { sourceRoot: 'src' },
+          b: { sourceRoot: 'src-electron' },
+          c: { sourceRoot: 'src/lib' },
+        },
+      }),
+    );
+    expect(
+      sourceRoots(dir)
+        .map((r) => relative(dir, r))
+        .sort(),
+    ).toEqual(['src', 'src-electron']);
+  });
+
+  it('reads a workspace file with comments and a trailing comma', async () => {
+    const dir = fixtureDir('ng-devtools-jsonc-');
+    mkdirSync(join(dir, 'apps', 'shop', 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'angular.json'),
+      '{\n  // the shop\n  "projects": { "shop": { "sourceRoot": "apps/shop/src" } },\n}',
+    );
+    writeFileSync(
+      join(dir, 'apps', 'shop', 'src', 'a.ts'),
+      "@Component({ selector: 'app-shop', template: '' }) class S {}",
+    );
+    const found = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(found.map((c) => c.selector)).toEqual(['app-shop']);
+  });
+
+  it('names a decorated accessor after the member, not the keyword', async () => {
+    const dir = workspace({
+      'src/a.ts': [
+        "@Component({ selector: 'app-legacy', template: '' })",
+        'export class Legacy {',
+        '  @Input() set value(v: string) {}',
+        '  @Input() private label: string;',
+        '  @Output() override changed = new EventEmitter();',
+        '}',
+      ].join('\n'),
+    });
+    const [component] = await getComponents.setup({ cwd: dir } as never).handler();
+    expect(component.inputs).toEqual(['value', 'label']);
+    expect(component.outputs).toEqual(['changed']);
+  });
+
+  it('finds a signal whose annotation holds a function type', async () => {
+    const dir = workspace({
+      'src/a.ts': 'class S { callback: WritableSignal<() => void> = signal(() => {}); }',
+    });
+    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    expect(found.map((s) => s.name)).toContain('callback');
+  });
+
+  it('does not report a store spelled out inside a regex literal', async () => {
+    const dir = workspace({
+      'src/a.ts':
+        'const pattern = /export const FakeStore = signalStore()/;\nexport const Real = signalStore(withState({}));',
+    });
+    const found = await getNgrxStore.setup({ cwd: dir } as never).handler();
+    expect(found.map((e) => e.name)).toEqual(['Real']);
   });
 });
