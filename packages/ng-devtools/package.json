@@ -30,7 +30,7 @@
     }
   },
   "scripts": {
-    "build": "tsdown && vite build --config ../../app/vite.config.ts --outDir $PWD/dist/public --emptyOutDir",
+    "build": "tsdown && vite build --config ../../app/vite.config.ts --outDir ../packages/ng-devtools/dist/public --emptyOutDir",
     "prepack": "pnpm build"
   },
   "files": [
