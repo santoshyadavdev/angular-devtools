@@ -41,7 +41,7 @@
   <p>All data processing happens entirely within your browser and your local machine. No information ever leaves your device.</p>
 
   <h2>Host Permissions</h2>
-  <p>The Extension requests host permissions (<code>&lt;all_urls&gt;</code>) solely to inject a lightweight content script that detects Angular on any page. The content script only checks for the presence of Angular and does not read or modify page content.</p>
+  <p>The Extension requests host permissions only for <code>localhost</code> and <code>127.0.0.1</code>, to reach the devframe server on the developer's own machine. It also runs a lightweight content script on pages to detect Angular. The content script only checks for the presence of Angular and does not read or modify page content.</p>
 
   <h2>Data Storage</h2>
   <p>The Extension does not persist any data between sessions. All inspection data exists only in memory while the DevTools panel is open and is discarded when the panel is closed.</p>

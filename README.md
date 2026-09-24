@@ -241,7 +241,7 @@ extension/
   "description": "Inspect Angular components, signals, DI, and routes.",
   "devtools_page": "devtools.html",
   "permissions": ["scripting"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
   "icons": {
     "128": "icon-128.png"
   }
