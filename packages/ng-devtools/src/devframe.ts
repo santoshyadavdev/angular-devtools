@@ -11,8 +11,9 @@ import type { NgrxRuntimeAction } from './types.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const clientAssets: RemoteAssets = {
-  package: '@santoshyadavdev/ng-devtools-assets',
+  package: pkg.name,
   version: pkg.version,
+  path: 'dist/public',
 };
 
 const ngDevtools = defineDevframe({

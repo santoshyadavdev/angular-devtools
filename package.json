@@ -7,7 +7,7 @@
   },
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "pnpm devtools:build-pkg && ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
@@ -20,8 +20,8 @@
     "devtools:standalone": "node bin.mjs dev",
     "devtools:mcp": "node bin.mjs mcp",
     "devtools:report": "node bin.mjs build --outDir dist-report",
-    "devtools:build-pkg": "npx vite build --config app/vite.config.ts --outDir $PWD/packages/ng-devtools-assets/dist --emptyOutDir",
-    "devtools:publish": "pnpm devtools:build-pkg && cd packages/ng-devtools-assets && npm publish --access public && cd ../ng-devtools && npm publish --access public",
+    "devtools:build-pkg": "pnpm --filter @santoshyadavdev/ng-devtools build",
+    "devtools:publish": "pnpm --filter @santoshyadavdev/ng-devtools publish --access public",
     "extension:build": "pnpm devtools:build && rm -rf extension/ui && cp -r dist/devtools-ui extension/ui",
     "extension:zip": "pnpm extension:build && cd extension && zip -r ../dist/ng-devtools-extension.zip . -x '*.DS_Store'"
   },

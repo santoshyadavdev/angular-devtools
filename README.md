@@ -21,11 +21,7 @@ Inspect Angular component trees, signals, dependency injection, and routes — a
 npm install @santoshyadavdev/ng-devtools devframe
 ```
 
-For MCP agent support, also install the optional peer:
-
-```sh
-npm install @devframes/agentic
-```
+MCP agent support (`@devframes/agentic`) is included.
 
 ## How to Use
 
@@ -192,28 +188,21 @@ pnpm devtools:dev
 # Build the devtools UI SPA
 pnpm devtools:build
 
-# Build assets into the publishable package
+# Build the publishable package (library + UI in dist/)
 pnpm devtools:build-pkg
 
-# Run the Angular host app (includes in-page devtools popup)
+# Run the Angular host app (builds the package first, includes in-page devtools popup)
 pnpm start
 ```
 
 ## Publishing
 
-The devtool ships as two npm packages:
-
-| Package                               | Contents                                               |
-| ------------------------------------- | ------------------------------------------------------ |
-| `@santoshyadavdev/ng-devtools`        | Node-side logic, RPC, CLI, overlay, popup              |
-| `@santoshyadavdev/ng-devtools-assets` | Built SPA (served at runtime via CDN or local install) |
+The devtool ships as one npm package, `@santoshyadavdev/ng-devtools`: Node-side logic, RPC, CLI, overlay, popup, and the built UI in `dist/public`.
 
 ```sh
-# Build assets, then publish both
+# Builds on prepack, then publishes
 pnpm devtools:publish
 ```
-
-Keep versions in sync — the tool references the assets package by exact version.
 
 ## Chrome DevTools Extension
 

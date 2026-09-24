@@ -27,7 +27,6 @@ packages/
     src/devframe.ts           # defineDevframe() — tool definition
     src/overlay.ts            # Client script running in user's page
     src/rpc/                  # Node-side RPC functions
-  ng-devtools-assets/         # Built SPA assets package
 extension/                    # Chrome DevTools extension
 src/                          # Angular host app (demo/playground)
 ```
