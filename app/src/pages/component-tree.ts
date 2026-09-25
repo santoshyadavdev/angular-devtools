@@ -329,6 +329,10 @@ export class ComponentTree {
     if (this.isSelected(comp)) {
       this.selected.set(null);
       this.selectedProviders.set([]);
+      const client = this.rpc();
+      if (client) {
+        client.scope('ng-devtools').rpc.callEvent('select-component', null);
+      }
       return;
     }
     this.selected.set(comp);

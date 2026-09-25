@@ -62,7 +62,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 
 - **Demo app (SSR):** `pnpm build --configuration development && node dist/angular-devtools/server/server.mjs` → http://localhost:4000
 - **Devtools SPA (hot reload):** `pnpm devtools:dev` → http://localhost:5173 (requires the SSR server running for RPC data)
-- **Demo app (SPA, no SSR):** `pnpm start` → auto-assigned port (runs `ng serve` with hot reload; devtools popup + RPC work without a separate server)
+- **Demo app (SPA, no SSR):** `pnpm start` → http://localhost:4200 (runs `ng serve` with SSR and hot reload; devtools popup + RPC work without a separate server)
 - The devtools popup appears on the demo app page; click it to open the inspector panel
 - Changes to `app/src/` (devtools SPA) are only visible via `pnpm devtools:dev`; the SSR server serves the npm-published assets
-- To publish updated SPA assets: `pnpm devtools:publish` (bumps both `ng-devtools` and `ng-devtools-assets` on npm)
+- To publish updated SPA assets: update versions in `packages/ng-devtools/package.json` and `packages/ng-devtools-assets/package.json`, then run `pnpm devtools:publish` (builds and publishes both `ng-devtools` and `ng-devtools-assets` to npm)
