@@ -34,6 +34,9 @@
     "devframe": "^1.0.0",
     "valibot": "^1.5.0"
   },
+  "devDependencies": {
+    "@santoshyadavdev/ng-devtools-assets": "workspace:*"
+  },
   "peerDependencies": {
     "@devframes/agentic": "^1.0.0"
   },
