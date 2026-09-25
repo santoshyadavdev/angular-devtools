@@ -6,7 +6,7 @@ import type { DevframeRpcClient } from 'devframe/client';
   template: `
     <div class="grid">
       <div class="card">
-        <h3>Project</h3>
+        <h2>Project</h2>
         <dl>
           <dt>Name</dt>
           <dd>{{ meta()?.projectName ?? '…' }}</dd>
@@ -19,27 +19,27 @@ import type { DevframeRpcClient } from 'devframe/client';
         </dl>
       </div>
       <div class="card clickable" (click)="navigate.emit('components')">
-        <h3>Components</h3>
+        <h2>Components</h2>
         <p class="big">{{ componentCount() }}</p>
         <p class="sub">discovered in source</p>
       </div>
       <div class="card clickable" (click)="navigate.emit('routes')">
-        <h3>Routes</h3>
+        <h2>Routes</h2>
         <p class="big">{{ routeCount() }}</p>
         <p class="sub">registered paths</p>
       </div>
       <div class="card clickable" (click)="navigate.emit('signals')">
-        <h3>Signals</h3>
+        <h2>Signals</h2>
         <p class="big">{{ signalCount() }}</p>
         <p class="sub">reactive primitives</p>
       </div>
       <div class="card clickable" (click)="navigate.emit('injectors')">
-        <h3>Injectors</h3>
+        <h2>Injectors</h2>
         <p class="big">{{ providerCount() }}</p>
         <p class="sub">DI providers</p>
       </div>
       <div class="card clickable" (click)="navigate.emit('store')">
-        <h3>NgRx Store</h3>
+        <h2>NgRx Store</h2>
         <p class="big">{{ storeCount() }}</p>
         <p class="sub">store entries</p>
       </div>
@@ -64,7 +64,7 @@ import type { DevframeRpcClient } from 'devframe/client';
     .card.clickable:hover {
       border-color: var(--accent);
     }
-    h3 {
+    h2 {
       font-size: 13px;
       text-transform: uppercase;
       color: #71717a;

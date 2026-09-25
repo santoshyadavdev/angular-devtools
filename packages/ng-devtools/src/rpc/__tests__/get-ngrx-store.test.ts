@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getNgrxStore } from '../get-ngrx-store.ts';
 
@@ -8,8 +9,7 @@ async function storeFor(source: string) {
   const dir = fixtureDir('ng-devtools-ngrx-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'store.ts'), source);
-  const { handler } = getNgrxStore.setup({ cwd: dir } as never);
-  return handler();
+  return scan(getNgrxStore, dir);
 }
 
 describe('get-ngrx-store', () => {

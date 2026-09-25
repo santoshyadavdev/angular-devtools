@@ -5,6 +5,7 @@ const frame = document.getElementById('devtools-frame');
 const status = document.getElementById('status');
 
 const tabId = chrome.devtools.inspectedWindow.tabId;
+const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 
 // Try to find the devframe connection on the inspected page
 function detectConnection() {
@@ -35,7 +36,7 @@ function detectConnection() {
       return null;
     })()`,
     (result, err) => {
-      if (result && result.base) {
+      if (result && paths.includes(result.base)) {
         loadPanel(result.base);
       } else {
         // No live devframe found — load in standalone/static mode
@@ -55,8 +56,12 @@ function loadPanel(baseURL) {
   if (baseURL) {
     // Get the inspected page's origin to build the full baseURL
     chrome.devtools.inspectedWindow.eval('location.origin', (origin) => {
-      const fullBase = origin + baseURL;
-      frame.src = `${panelUrl}?baseURL=${encodeURIComponent(fullBase)}`;
+      const url = new URL(baseURL, origin);
+      if (!LOCAL_HOSTS.includes(url.hostname)) {
+        frame.src = panelUrl;
+        return;
+      }
+      frame.src = `${panelUrl}?baseURL=${encodeURIComponent(url.href)}`;
     });
   } else {
     frame.src = panelUrl;

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getProviders } from '../get-providers.ts';
 
@@ -8,8 +9,7 @@ async function providersFor(source: string) {
   const dir = fixtureDir('ng-devtools-providers-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'app.ts'), source);
-  const { handler } = getProviders.setup({ cwd: dir } as never);
-  return handler();
+  return scan(getProviders, dir);
 }
 
 describe('get-providers', () => {

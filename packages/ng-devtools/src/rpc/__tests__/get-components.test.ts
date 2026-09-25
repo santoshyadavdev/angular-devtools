@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getComponents } from '../get-components.ts';
 
@@ -8,8 +9,7 @@ async function componentsFor(source: string) {
   const dir = fixtureDir('ng-devtools-components-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'widgets.ts'), source);
-  const { handler } = getComponents.setup({ cwd: dir } as never);
-  return handler();
+  return scan(getComponents, dir);
 }
 
 describe('get-components', () => {

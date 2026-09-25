@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { defineConfig } from 'vite';
 import angular from '@analogjs/vite-plugin-angular';
 import { devframeViteBridge } from '@devframes/vite/single';
@@ -18,7 +19,7 @@ export default defineConfig({
     ],
   },
   plugins: [
-    angular({ tsconfig: './app/tsconfig.json' }),
+    angular({ tsconfig: join(import.meta.dirname, 'tsconfig.json') }),
     devframeViteBridge(ngDevtools, { base: '/__ng-devtools/', auth: false }),
   ],
 });

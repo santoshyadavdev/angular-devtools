@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getSignals } from '../get-signals.ts';
 
@@ -8,8 +9,7 @@ async function signalsFor(source: string) {
   const dir = fixtureDir('ng-devtools-signals-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'app.ts'), source);
-  const { handler } = getSignals.setup({ cwd: dir } as never);
-  return handler();
+  return scan(getSignals, dir);
 }
 
 describe('get-signals', () => {

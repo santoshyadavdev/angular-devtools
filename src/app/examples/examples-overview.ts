@@ -14,7 +14,7 @@ interface ExampleLink {
   template: `
     <section>
       <p class="lead">
-        Four pages, each built to fill one DevTools inspector. Open the popup with the button in the
+        Five pages, each built to fill one DevTools inspector. Open the popup with the button in the
         corner, then work through them.
       </p>
 
@@ -134,6 +134,12 @@ export class ExamplesOverview {
       tab: 'Routes',
       title: 'Nested routes',
       blurb: 'Children, grandchildren, a redirect, route data and a lazy child config.',
+    },
+    {
+      path: 'forms',
+      tab: 'Forms',
+      title: 'Every kind of form',
+      blurb: 'Signal Forms, reactive and template-driven forms with failing validators.',
     },
   ];
 }

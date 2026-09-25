@@ -44,5 +44,10 @@ export const examplesRoutes: Routes = [
       },
     ],
   },
+  {
+    path: 'forms',
+    loadComponent: () => import('./forms-example').then((m) => m.FormsExample),
+    data: { title: 'Forms', inspector: 'forms' },
+  },
   { path: 'injectors', redirectTo: 'di', pathMatch: 'full' },
 ];

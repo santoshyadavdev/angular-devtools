@@ -9,6 +9,7 @@ Inspect Angular component trees, signals, dependency injection, and routes — a
 - **DI inspector** — browse the injector hierarchy (element and environment) with providers at each level (Angular 17+)
 - **Route inspector** — list registered routes from source
 - **NgRx Store inspector** — detect `@ngrx/store` (actions, reducers, effects, selectors) and `@ngrx/signals` (`signalStore`, `signalState`, `signalMethod`) patterns from source; live state & action log via Redux DevTools protocol
+- **Forms inspector** — every form on the page (Signal Forms, reactive and template-driven) with each field's value, status, touched/dirty state and readable errors, plus a timeline of recent changes; hover a field to highlight its input
 - **Build metadata** — Angular version, TypeScript version, SSR status
 - **In-page popup** — floating devtools panel with dock modes (float, bottom, right), drag, resize, and localStorage persistence
 - **Agent-native** — all inspectors exposed as MCP tools and resources
@@ -21,11 +22,7 @@ Inspect Angular component trees, signals, dependency injection, and routes — a
 npm install @santoshyadavdev/ng-devtools devframe
 ```
 
-For MCP agent support, also install the optional peer:
-
-```sh
-npm install @devframes/agentic
-```
+MCP agent support (`@devframes/agentic`) is included.
 
 ## How to Use
 
@@ -91,26 +88,40 @@ When embedded in Express, the MCP endpoint is also available over HTTP at `/__ng
 
 MCP clients see these with an underscore, as `ng-devtools_get-routes`.
 
-| Tool                            | Description                                                 |
-| ------------------------------- | ----------------------------------------------------------- |
-| `ng-devtools:get-routes`        | List Angular routes from source                             |
-| `ng-devtools:get-components`    | Discover components and directives, with inputs and outputs |
-| `ng-devtools:get-signals`       | Signal declarations from source                             |
-| `ng-devtools:get-providers`     | DI providers from source                                    |
-| `ng-devtools:build-meta`        | Angular/TS versions, SSR status                             |
-| `ng-devtools:highlight`         | Highlight a component in the page                           |
-| `ng-devtools:inspect-signals`   | Signal graph a connected page reported                      |
-| `ng-devtools:inspect-providers` | Injector tree a connected page reported                     |
-| `ng-devtools:get-ngrx-store`    | Scan source for NgRx store patterns                         |
+| Tool                               | Description                                                 |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `ng-devtools:get-routes`           | List Angular routes from source                             |
+| `ng-devtools:get-components`       | Discover components and directives, with inputs and outputs |
+| `ng-devtools:get-signals`          | Signal declarations from source                             |
+| `ng-devtools:get-providers`        | DI providers from source                                    |
+| `ng-devtools:build-meta`           | Angular/TS versions, SSR status                             |
+| `ng-devtools:highlight`            | Highlight a component in the page                           |
+| `ng-devtools:inspect-signals`      | Signal graph a connected page reported                      |
+| `ng-devtools:inspect-providers`    | Injector tree a connected page reported                     |
+| `ng-devtools:get-ngrx-store`       | Scan source for NgRx store patterns                         |
+| `ng-devtools:inspect-forms`        | Forms on the page with every field's state and errors       |
+| `ng-devtools:explain-form-invalid` | Which fields make a form invalid, and why                   |
+
+#### Forms
+
+The Forms tab and the forms tools read Signal Forms, reactive forms and template-driven forms from the running page, in development builds only. Signal Forms need Angular 21 or later. The live change timeline for reactive and template-driven forms uses `control.events` (Angular 18+); on Angular 17 changes are picked up every few seconds instead, without submit and reset events.
+
+- Each field shows its value, status, touched/dirty state and errors, plus: Signal Forms constraints (`min`, `max`, `minLength`, `maxLength`, `pattern`), a pending `debounce`, `submitting`, and disabled reasons; for reactive and template-driven forms, whether validators and async validators are attached, the value `reset()` goes back to, `updateOn`, and the bound `ControlValueAccessor`.
+- `ng-devtools:explain-form-invalid` is the tool to reach for first: without arguments it lists every form that is invalid or waiting on async validation, with each failing field's current value, the validator that failed, its message and whether it was touched. Pass `form` (an id like `form-1`, or part of a label like `SignupComponent`) to explain one form.
+- `ng-devtools:inspect-forms` lists the forms with their status and error counts. Pass `form` for a field tree, plus `path` (e.g. `address.city`), `onlyInvalid` or `includeValues: false` to narrow it down.
+- Both tools note when the page last reported, so an agent can tell when the data is stale.
+
+Form values leave the page: they are sent to the devtools server, shown in the Forms tab and returned to agents. Values of password fields, fields with a password, one-time-code or credit-card `autocomplete`, and fields whose name looks secret (password, token, card, cvv and similar) are replaced with `[redacted]`. Other values are sent as they are, so keep real credentials out of forms you inspect, and don't expose the dev server beyond localhost.
 
 #### Agent Resources
 
-| Resource                     | Content                      |
-| ---------------------------- | ---------------------------- |
-| `ng-devtools:component-tree` | Live component hierarchy     |
-| `ng-devtools:signal-graph`   | Signal dependency graph      |
-| `ng-devtools:injector-tree`  | DI injector hierarchy        |
-| `ng-devtools:ngrx-store`     | Live NgRx state & action log |
+| Resource                     | Content                       |
+| ---------------------------- | ----------------------------- |
+| `ng-devtools:component-tree` | Live component hierarchy      |
+| `ng-devtools:signal-graph`   | Signal dependency graph       |
+| `ng-devtools:injector-tree`  | DI injector hierarchy         |
+| `ng-devtools:ngrx-store`     | Live NgRx state & action log  |
+| `ng-devtools:forms`          | Live forms and recent changes |
 
 ### Vite DevTools Dock
 
@@ -192,28 +203,21 @@ pnpm devtools:dev
 # Build the devtools UI SPA
 pnpm devtools:build
 
-# Build assets into the publishable package
+# Build the publishable package (library + UI in dist/)
 pnpm devtools:build-pkg
 
-# Run the Angular host app (includes in-page devtools popup)
+# Run the Angular host app (builds the package first, includes in-page devtools popup)
 pnpm start
 ```
 
 ## Publishing
 
-The devtool ships as two npm packages:
-
-| Package                               | Contents                                               |
-| ------------------------------------- | ------------------------------------------------------ |
-| `@santoshyadavdev/ng-devtools`        | Node-side logic, RPC, CLI, overlay, popup              |
-| `@santoshyadavdev/ng-devtools-assets` | Built SPA (served at runtime via CDN or local install) |
+The devtool ships as one npm package, `@santoshyadavdev/ng-devtools`: Node-side logic, RPC, CLI, overlay, popup, and the built UI in `dist/public`.
 
 ```sh
-# Build assets, then publish both
+# Builds on prepack, then publishes
 pnpm devtools:publish
 ```
-
-Keep versions in sync — the tool references the assets package by exact version.
 
 ## Chrome DevTools Extension
 
@@ -241,7 +245,12 @@ extension/
   "description": "Inspect Angular components, signals, DI, and routes.",
   "devtools_page": "devtools.html",
   "permissions": ["scripting"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "http://localhost/*",
+    "https://localhost/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*"
+  ],
   "icons": {
     "128": "icon-128.png"
   }

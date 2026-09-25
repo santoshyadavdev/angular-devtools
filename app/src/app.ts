@@ -6,15 +6,24 @@ import { RouteInspector } from './pages/route-inspector';
 import { SignalInspector } from './pages/signal-inspector';
 import { DiInspector } from './pages/di-inspector';
 import { StoreInspector } from './pages/store-inspector';
+import { FormsInspector } from './pages/forms-inspector';
 
-type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'store';
+type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'store' | 'forms';
 
 @Component({
   selector: 'app-root',
-  imports: [Dashboard, ComponentTree, RouteInspector, SignalInspector, DiInspector, StoreInspector],
+  imports: [
+    Dashboard,
+    ComponentTree,
+    RouteInspector,
+    SignalInspector,
+    DiInspector,
+    StoreInspector,
+    FormsInspector,
+  ],
   template: `
     <header>
-      <div class="brand">
+      <h1 class="brand">
         <!-- The Angular shield, from the wordmark on angular.dev. -->
         <svg width="20" height="22" viewBox="0 0 223 236" fill="url(#ng-logo)" aria-hidden="true">
           <defs>
@@ -39,7 +48,7 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
           />
         </svg>
         <span>Angular DevTools</span>
-      </div>
+      </h1>
       <nav>
         @for (t of tabs; track t.id) {
           <button [class.active]="tab() === t.id" (click)="switchTab(t.id)">{{ t.label }}</button>
@@ -69,6 +78,9 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
         @case ('store') {
           <app-store-inspector [rpc]="rpc()" />
         }
+        @case ('forms') {
+          <app-forms-inspector [rpc]="rpc()" />
+        }
       }
     </main>
   `,
@@ -80,6 +92,7 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
     }
     header {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 16px;
       padding: 8px 16px;
@@ -87,6 +100,8 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
       border-bottom: 1px solid #27272a;
     }
     .brand {
+      margin: 0;
+      font-size: inherit;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -99,8 +114,16 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
     }
     nav {
       display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       flex: 1;
+      min-width: 0;
+    }
+    @media (max-width: 640px) {
+      nav {
+        order: 3;
+        flex-basis: 100%;
+      }
     }
     nav button {
       padding: 6px 14px;
@@ -121,6 +144,7 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
       color: #fff;
     }
     .status {
+      margin-left: auto;
       font-size: 12px;
       padding: 3px 10px;
       border-radius: 99px;
@@ -146,6 +170,7 @@ export class App implements OnInit, OnDestroy {
     { id: 'signals' as Tab, label: 'Signals' },
     { id: 'injectors' as Tab, label: 'Injectors' },
     { id: 'store' as Tab, label: 'Store' },
+    { id: 'forms' as Tab, label: 'Forms' },
   ];
 
   tab = signal<Tab>('dashboard');

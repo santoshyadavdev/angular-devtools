@@ -7,12 +7,25 @@ import { getSignals } from './rpc/get-signals.ts';
 import { getProviders } from './rpc/get-providers.ts';
 import { getNgrxStore } from './rpc/get-ngrx-store.ts';
 import type { NgrxRuntimeAction } from './types.ts';
+import {
+  explainFormsText,
+  formsResourceText,
+  currentForms,
+  expirePages,
+  inspectFormsText,
+  isPageReport,
+  mergePageReport,
+  type PageReport,
+  type FormsState,
+  type InspectFormsArgs,
+} from './rpc/forms-tools.ts';
 
 import pkg from '../package.json' with { type: 'json' };
 
 const clientAssets: RemoteAssets = {
-  package: '@santoshyadavdev/ng-devtools-assets',
+  package: pkg.name,
   version: pkg.version,
+  path: 'dist/public',
 };
 
 const ngDevtools = defineDevframe({
@@ -70,6 +83,58 @@ const ngDevtools = defineDevframe({
         state: null as unknown,
         actions: [] as NgrxRuntimeAction[],
         connected: false,
+      },
+    });
+
+    const formPages = new Map<string, PageReport & { reportedAt: number }>();
+    const formsState = await my.rpc.sharedState('forms', {
+      initialValue: { forms: [], events: [], reportedAt: 0 } as FormsState,
+    });
+
+    const applyForms = (next: FormsState) =>
+      formsState.mutate((draft) => {
+        draft.forms = next.forms;
+        draft.events = next.events;
+        draft.reportedAt = next.reportedAt;
+      });
+
+    my.rpc.register({
+      name: 'push-forms',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (report: unknown) => {
+        if (!isPageReport(report)) return;
+        applyForms(mergePageReport(formPages, report));
+      },
+    });
+
+    const expiry = setInterval(() => {
+      const next = expirePages(formPages);
+      if (next) applyForms(next);
+    }, 5000);
+    expiry.unref?.();
+
+    my.rpc.register({
+      name: 'forget-forms-page',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (pageId: string) => {
+        if (typeof pageId === 'string' && formPages.delete(pageId)) {
+          applyForms(currentForms(formPages));
+        }
+      },
+    });
+
+    my.rpc.register({
+      name: 'request-form-highlight',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (target: { formId: string; path: string } | null) => {
+        void my.rpc.broadcast({
+          method: 'highlight-form-field',
+          args: [target],
+          optional: true,
+        });
       },
     });
 
@@ -167,6 +232,15 @@ const ngDevtools = defineDevframe({
       read: () => ({ text: JSON.stringify(ngrxStoreState.value(), null, 2) }),
     });
 
+    ctx.agent.registerResource({
+      id: 'ng-devtools:forms',
+      name: 'Angular Forms',
+      description:
+        "Every form a connected page last reported (Signal Forms, reactive and template-driven), with each field's value, status, touched, dirty and errors, plus recent changes. Empty when no page is connected.",
+      mimeType: 'application/json',
+      read: () => ({ text: formsResourceText(formsState.value() as FormsState) }),
+    });
+
     // Agent tools
     ctx.agent.registerTool({
       id: 'ng-devtools:highlight',
@@ -260,6 +334,60 @@ const ngDevtools = defineDevframe({
         return {
           markdown: `This is the injector tree for the whole page${scope}:\n\n${JSON.stringify(roots, null, 2)}`,
         };
+      },
+    });
+
+    const noForms = `No forms have been reported. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser, on a page that renders a form. The stdio server has no page attached and only ever reports this.`;
+    const formProperty = {
+      type: 'string',
+      description: 'Form id (form-1) or part of its label (Component.property).',
+    };
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:inspect-forms',
+      description:
+        'Inspect the forms on the running page (Signal Forms, reactive and template-driven). Without arguments it lists each form with its status and error count. Pass `form` for its field tree (value, status, touched, dirty, errors per field). Password and other secret-looking values are redacted. For "why is this form invalid", call explain-form-invalid first.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          path: {
+            type: 'string',
+            description:
+              'Dotted field path to start the tree at, e.g. address.city or tags.1. Applies to every matched form.',
+          },
+          onlyInvalid: {
+            type: 'boolean',
+            description: 'Only include invalid or pending fields and their parents.',
+          },
+          includeValues: {
+            type: 'boolean',
+            description:
+              "Include field values in this tool's output (default true). When false, values and value-bearing error params are left out; a custom error message that quotes the value is still returned as is.",
+          },
+        },
+      },
+      handler: async (args: InspectFormsArgs) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        return { markdown: inspectFormsText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-form-invalid',
+      description:
+        'Explain why forms on the running page are invalid: each failing field with its current value, the validator that failed, its message and whether it was touched, plus fields waiting on async validators and disabled reasons. Without `form` it covers every form that is invalid or waiting on async validation.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: { form: formProperty },
+      },
+      handler: async (args: { form?: string }) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        return { markdown: explainFormsText(state, args) };
       },
     });
   },

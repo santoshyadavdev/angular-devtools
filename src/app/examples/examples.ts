@@ -28,6 +28,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
         >
         <a routerLink="di" routerLinkActive="active" ariaCurrentWhenActive="page">Injectors</a>
         <a routerLink="routes" routerLinkActive="active" ariaCurrentWhenActive="page">Routes</a>
+        <a routerLink="forms" routerLinkActive="active" ariaCurrentWhenActive="page">Forms</a>
       </nav>
 
       <router-outlet />

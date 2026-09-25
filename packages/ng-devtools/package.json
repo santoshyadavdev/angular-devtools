@@ -3,6 +3,12 @@
   "version": "0.0.2",
   "description": "Angular DevTools — inspect components, signals, DI, and routes. Runs standalone, embedded, or over MCP.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/santoshyadavdev/angular-devtools.git",
+    "directory": "packages/ng-devtools"
+  },
+  "homepage": "https://github.com/santoshyadavdev/angular-devtools#readme",
   "type": "module",
   "bin": {
     "ng-devtools": "./bin.mjs"
@@ -11,12 +17,25 @@
     ".": "./src/devframe.ts",
     "./devframe": "./src/devframe.ts",
     "./overlay": "./src/overlay.ts",
-    "./popup": "./src/popup.ts"
+    "./popup": "./src/popup.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/devframe.mjs",
+      "./devframe": "./dist/devframe.mjs",
+      "./overlay": "./dist/overlay.mjs",
+      "./popup": "./dist/popup.mjs",
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsdown && vite build --config ../../app/vite.config.ts --outDir ../packages/ng-devtools/dist/public --emptyOutDir",
+    "prepack": "pnpm build"
   },
   "files": [
-    "src",
-    "bin.mjs",
-    "!src/**/__tests__"
+    "dist",
+    "bin.mjs"
   ],
   "keywords": [
     "angular",
@@ -27,17 +46,16 @@
     "mcp"
   ],
   "dependencies": {
+    "@devframes/agentic": "^1.0.0",
     "@valibot/to-json-schema": "^1.8.0",
     "cac": "^7.0.0",
     "devframe": "^1.0.0",
     "valibot": "^1.5.0"
   },
-  "peerDependencies": {
-    "@devframes/agentic": "^1.0.0"
+  "devDependencies": {
+    "tsdown": "^0.23.0"
   },
-  "peerDependenciesMeta": {
-    "@devframes/agentic": {
-      "optional": true
-    }
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -1,14 +1,13 @@
-import { isDevMode } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
 
-bootstrapApplication(App, appConfig).catch((err) => console.error(err));
-
-// Load the devtools popup in development only
-if (typeof window !== 'undefined' && isDevMode()) {
-  import('@santoshyadavdev/ng-devtools/popup').then(
-    (m) => m.createDevtoolsPopup(),
-    () => {},
-  );
-}
+// Load the devtools overlay (which also opens the popup) in development only
+bootstrapApplication(App, appConfig)
+  .then((ref) => {
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+      return ref.whenStable().then(() => import('@santoshyadavdev/ng-devtools/overlay'));
+    }
+    return undefined;
+  })
+  .catch((err) => console.error(err));

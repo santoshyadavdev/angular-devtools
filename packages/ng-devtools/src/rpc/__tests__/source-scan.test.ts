@@ -1,6 +1,7 @@
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getComponents } from '../get-components.ts';
 import { getNgrxStore } from '../get-ngrx-store.ts';
@@ -45,10 +46,10 @@ describe('lexing', () => {
       ].join('\n'),
     });
 
-    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    const components = await scan(getComponents, dir);
     expect(components.map((c) => c.selector)).toEqual(['app-first', 'app-second']);
 
-    const signals = await getSignals.setup({ cwd: dir } as never).handler();
+    const signals = await scan(getSignals, dir);
     expect(signals.map((s) => s.name)).toEqual(['count']);
   });
 
@@ -59,7 +60,7 @@ describe('lexing', () => {
         'export const routes = [{ path: 1, component: Home }];'.replace('1', "'home'"),
       ].join('\n'),
     });
-    const routes = await getRoutes.setup({ cwd: dir } as never).handler();
+    const routes = await scan(getRoutes, dir);
     expect(routes.map((r) => r.path)).toEqual(['home']);
   });
 
@@ -92,7 +93,7 @@ describe('source roots', () => {
       { projects: { app: { sourceRoot: 'src' }, lib: { sourceRoot: 'src/lib/src' } } },
     );
     expect(sourceRoots(dir)).toEqual([join(dir, 'src')]);
-    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    const components = await scan(getComponents, dir);
     expect(components.map((c) => c.selector)).toEqual(['lib-x']);
   });
 
@@ -113,7 +114,7 @@ describe('component metadata', () => {
         'export class Legacy {}',
       ].join('\n'),
     });
-    const components = await getComponents.setup({ cwd: dir } as never).handler();
+    const components = await scan(getComponents, dir);
     expect(components.map((c) => [c.selector, c.isStandalone])).toEqual([
       ['app-modern', true],
       ['app-legacy', false],
@@ -137,7 +138,7 @@ describe('matchDelimiter', () => {
         `@Component({ selector: 'c${i}', providers: [{ provide: T${i}, useValue: /\\[/ }, Real${i}] })\nexport class C${i} {}`,
     ).join('\n');
     const dir = workspace({ 'src/a.ts': files });
-    const providers = await getProviders.setup({ cwd: dir } as never).handler();
+    const providers = await scan(getProviders, dir);
     expect(providers).toHaveLength(800);
   });
 });
@@ -175,7 +176,7 @@ describe('review regressions', () => {
       join(dir, 'apps', 'shop', 'src', 'a.ts'),
       "@Component({ selector: 'app-shop', template: '' }) class S {}",
     );
-    const found = await getComponents.setup({ cwd: dir } as never).handler();
+    const found = await scan(getComponents, dir);
     expect(found.map((c) => c.selector)).toEqual(['app-shop']);
   });
 
@@ -190,7 +191,7 @@ describe('review regressions', () => {
         '}',
       ].join('\n'),
     });
-    const [component] = await getComponents.setup({ cwd: dir } as never).handler();
+    const [component] = await scan(getComponents, dir);
     expect(component.inputs).toEqual(['value', 'label']);
     expect(component.outputs).toEqual(['changed']);
   });
@@ -199,7 +200,7 @@ describe('review regressions', () => {
     const dir = workspace({
       'src/a.ts': 'class S { callback: WritableSignal<() => void> = signal(() => {}); }',
     });
-    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    const found = await scan(getSignals, dir);
     expect(found.map((s) => s.name)).toContain('callback');
   });
 
@@ -208,7 +209,7 @@ describe('review regressions', () => {
       'src/a.ts':
         'const pattern = /export const FakeStore = signalStore()/;\nexport const Real = signalStore(withState({}));',
     });
-    const found = await getNgrxStore.setup({ cwd: dir } as never).handler();
+    const found = await scan(getNgrxStore, dir);
     expect(found.map((e) => e.name)).toEqual(['Real']);
   });
 });
@@ -222,7 +223,7 @@ describe('second review pass', () => {
         'export class Real {}',
       ].join('\n'),
     });
-    const found = await getComponents.setup({ cwd: dir } as never).handler();
+    const found = await scan(getComponents, dir);
     expect(found.map((c) => c.selector)).toEqual(['app-real']);
   });
 
@@ -251,7 +252,7 @@ describe('third review pass', () => {
         'export class X {}',
       ].join('\n'),
     });
-    const [component] = await getComponents.setup({ cwd: dir } as never).handler();
+    const [component] = await scan(getComponents, dir);
     expect(component.isStandalone).toBe(false);
   });
 
@@ -263,7 +264,7 @@ describe('third review pass', () => {
         'export class Real {}',
       ].join('\n'),
     });
-    const found = await getProviders.setup({ cwd: dir } as never).handler();
+    const found = await scan(getProviders, dir);
     expect(found.map((p) => p.token)).toEqual(['Real']);
   });
 
@@ -271,7 +272,7 @@ describe('third review pass', () => {
     const dir = workspace({
       'src/a.ts': "@Injectable({ providedIn: 'root' })\n@Trace()\nexport class Api {}",
     });
-    const found = await getProviders.setup({ cwd: dir } as never).handler();
+    const found = await scan(getProviders, dir);
     expect(found.map((p) => p.token)).toContain('Api');
   });
 
@@ -279,7 +280,7 @@ describe('third review pass', () => {
     const dir = workspace({
       'src/a.ts': '@Injectable({ providedIn: FeatureModule })\nexport class Api {}',
     });
-    const [provider] = await getProviders.setup({ cwd: dir } as never).handler();
+    const [provider] = await scan(getProviders, dir);
     expect(provider.providedIn).toBe('FeatureModule');
   });
 
@@ -287,7 +288,7 @@ describe('third review pass', () => {
     const dir = workspace({
       'src/a.ts': 'class C { constructor(label: string, count = signal(0)) {} }',
     });
-    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    const found = await scan(getSignals, dir);
     expect(found.map((s) => s.name)).toEqual(['count']);
   });
 
@@ -295,7 +296,7 @@ describe('third review pass', () => {
     const dir = workspace({
       'src/a.ts': 'class C { totals: Signal<Record<string, number>> = signal({}); }',
     });
-    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    const found = await scan(getSignals, dir);
     expect(found.map((s) => s.name)).toContain('totals');
   });
 

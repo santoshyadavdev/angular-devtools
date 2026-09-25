@@ -7,11 +7,12 @@
   },
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "pnpm devtools:build-pkg && ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:devtools": "vitest run --root packages/ng-devtools",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit && tsc -p app/tsconfig.json --noEmit && tsc -p packages/ng-devtools",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "serve:ssr:angular-devtools": "node dist/angular-devtools/server/server.mjs",
@@ -20,13 +21,16 @@
     "devtools:standalone": "node bin.mjs dev",
     "devtools:mcp": "node bin.mjs mcp",
     "devtools:report": "node bin.mjs build --outDir dist-report",
-    "devtools:build-pkg": "npx vite build --config app/vite.config.ts --outDir $PWD/packages/ng-devtools-assets/dist --emptyOutDir",
-    "devtools:publish": "pnpm devtools:build-pkg && cd packages/ng-devtools-assets && npm publish --access public && cd ../ng-devtools && npm publish --access public",
+    "devtools:build-pkg": "pnpm --filter @santoshyadavdev/ng-devtools build",
+    "devtools:publish": "pnpm --filter @santoshyadavdev/ng-devtools publish --access public",
     "extension:build": "pnpm devtools:build && rm -rf extension/ui && cp -r dist/devtools-ui extension/ui",
     "extension:zip": "pnpm extension:build && cd extension && zip -r ../dist/ng-devtools-extension.zip . -x '*.DS_Store'"
   },
   "private": true,
   "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "@angular/common": "^22.1.0",
     "@angular/compiler": "^22.1.0",
@@ -53,7 +57,7 @@
     "@devframes/agentic": "^1.0.0",
     "@devframes/vite": "^1.0.0",
     "@types/express": "^5.0.1",
-    "@types/node": "^20.17.19",
+    "@types/node": "^24.0.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
