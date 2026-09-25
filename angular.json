@@ -28,7 +28,7 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": ["angular-devtools.onrender.com", "localhost"]
             },
             "ssr": {
               "entry": "src/server.ts"
