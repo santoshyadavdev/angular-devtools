@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getComponents } from '../get-components.ts';
 import { getNgrxStore } from '../get-ngrx-store.ts';
@@ -20,8 +21,7 @@ async function componentsIn(workspace: unknown, layout: Record<string, string>) 
   const dir = fixtureDir('ng-devtools-roots-');
   if (workspace) writeFileSync(join(dir, 'angular.json'), JSON.stringify(workspace));
   for (const [at, selector] of Object.entries(layout)) component(dir, at, selector);
-  const { handler } = getComponents.setup({ cwd: dir } as never);
-  return (await handler()).map((c) => c.selector).sort();
+  return (await scan(getComponents, dir)).map((c) => c.selector).sort();
 }
 
 describe('source roots', () => {
@@ -90,19 +90,19 @@ describe('every scanner reads the workspace source roots', () => {
       'a.ts',
       "@Component({ selector: 'app-shop', template: '' }) class S {}",
     );
-    const found = await getComponents.setup({ cwd: dir } as never).handler();
+    const found = await scan(getComponents, dir);
     expect(found.map((c) => c.selector)).toEqual(['app-shop']);
   });
 
   it('finds signals outside src', async () => {
     const dir = multiProject('a.ts', 'class S { count = signal(0); }');
-    const found = await getSignals.setup({ cwd: dir } as never).handler();
+    const found = await scan(getSignals, dir);
     expect(found.map((s) => s.name)).toEqual(['count']);
   });
 
   it('finds providers outside src', async () => {
     const dir = multiProject('a.ts', "@Injectable({ providedIn: 'root' }) class Api {}");
-    const found = await getProviders.setup({ cwd: dir } as never).handler();
+    const found = await scan(getProviders, dir);
     expect(found.map((p) => p.token)).toContain('Api');
   });
 
@@ -111,13 +111,13 @@ describe('every scanner reads the workspace source roots', () => {
       'app.routes.ts',
       "export const routes = [{ path: 'home', component: Home }];",
     );
-    const found = await getRoutes.setup({ cwd: dir } as never).handler();
+    const found = await scan(getRoutes, dir);
     expect(found.map((r) => r.path)).toEqual(['home']);
   });
 
   it('finds ngrx stores outside src', async () => {
     const dir = multiProject('store.ts', 'export const S = signalStore(withState({}));');
-    const found = await getNgrxStore.setup({ cwd: dir } as never).handler();
+    const found = await scan(getNgrxStore, dir);
     expect(found.map((e) => e.name)).toContain('S');
   });
 });

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixtureDir } from './fixture-dir.ts';
+import { scan } from './scan.ts';
 import { describe, expect, it } from 'vitest';
 import { getRoutes } from '../get-routes.ts';
 
@@ -8,8 +9,7 @@ async function routesFor(source: string) {
   const dir = fixtureDir('ng-devtools-routes-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'app.routes.ts'), source);
-  const { handler } = getRoutes.setup({ cwd: dir } as never);
-  return handler();
+  return scan(getRoutes, dir);
 }
 
 describe('get-routes', () => {

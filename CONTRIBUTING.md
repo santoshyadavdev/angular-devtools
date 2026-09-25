@@ -75,7 +75,10 @@ Add `agent: { description }` to any RPC function, or use `ctx.agent.registerTool
 ## Testing
 
 ```sh
-pnpm test
+pnpm test            # host app
+pnpm test:devtools   # devtools package
+pnpm typecheck       # host app + specs, devtools UI, devtools package + its tests
+pnpm format:check
 ```
 
 ## Submitting a PR
@@ -83,5 +86,6 @@ pnpm test
 1. Fork and create a branch from `main`
 2. Make your changes
 3. Verify `pnpm devtools:build` succeeds
-4. Test with `pnpm devtools:dev`
-5. Open a PR against `main`
+4. If you changed `app/`, run `pnpm extension:build && pnpm devtools:build-pkg` and commit `extension/ui` and `packages/ng-devtools-assets/dist`. CI fails when they are stale
+5. Test with `pnpm devtools:dev`
+6. Open a PR against `main`

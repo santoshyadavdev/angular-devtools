@@ -11,7 +11,7 @@ async function boot() {
   const ctx = await createHostContext({ cwd: process.cwd(), mode: 'dev', host: host as never });
   await ngDevtools.setup(ctx as never);
   const push = (name: string, payload: unknown) =>
-    ctx.rpc.invokeLocal(`ng-devtools:${name}` as never, payload as never);
+    ctx.rpc.invokeLocal(`ng-devtools:${name}` as never, ...([payload] as never));
   const call = async (tool: string, selector: string) =>
     ((await ctx.agent.invoke(`ng-devtools:${tool}`, { selector })) as { markdown: string })
       .markdown;

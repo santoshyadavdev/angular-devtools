@@ -16,6 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -23,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -31,20 +32,32 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Type-check
+        run: pnpm typecheck
+
       - name: Test host app
         run: pnpm test
 
       - name: Test devtools package
         run: pnpm test:devtools
 
-      - name: Build devtools UI
-        run: pnpm devtools:build
-
       - name: Build Angular host app (SSR)
         run: pnpm build
 
       - name: Build Chrome extension
         run: pnpm extension:build
+
+      - name: Build devtools assets package
+        run: pnpm devtools:build-pkg
+
+      - name: Check committed build output is current
+        run: |
+          stale=$(git status --porcelain -- extension/ui packages/ng-devtools-assets/dist)
+          if [ -n "$stale" ]; then
+            echo "$stale"
+            echo "::error::Committed build output is stale. Run 'pnpm extension:build && pnpm devtools:build-pkg' and commit the result."
+            exit 1
+          fi
 
       - name: Smoke-test the CLI
         run: node bin.mjs --help
