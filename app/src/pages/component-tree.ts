@@ -41,7 +41,11 @@ interface ProviderEntry {
       <ul class="component-list" role="list">
         @for (comp of filtered(); track comp.selector) {
           <li class="component-item" [class.expanded]="isSelected(comp)">
-            <button class="component-toggle" [attr.aria-expanded]="isSelected(comp)" (click)="select(comp)">
+            <button
+              class="component-toggle"
+              [attr.aria-expanded]="isSelected(comp)"
+              (click)="select(comp)"
+            >
               <div class="selector">&lt;{{ comp.selector }}&gt;</div>
               <div class="file">{{ comp.file }}</div>
             </button>
