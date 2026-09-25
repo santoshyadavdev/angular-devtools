@@ -40,10 +40,12 @@ interface ProviderEntry {
     } @else {
       <ul class="component-list" role="list">
         @for (comp of filtered(); track comp.selector) {
-          <li class="component-item" [class.expanded]="selected() === comp" (click)="select(comp)">
-            <div class="selector">&lt;{{ comp.selector }}&gt;</div>
-            <div class="file">{{ comp.file }}</div>
-            @if (selected() === comp) {
+          <li class="component-item" [class.expanded]="isSelected(comp)">
+            <button class="component-toggle" [attr.aria-expanded]="isSelected(comp)" (click)="select(comp)">
+              <div class="selector">&lt;{{ comp.selector }}&gt;</div>
+              <div class="file">{{ comp.file }}</div>
+            </button>
+            @if (isSelected(comp)) {
               <div class="inline-detail">
                 <dl>
                   <dt>File</dt>
@@ -136,15 +138,25 @@ interface ProviderEntry {
       background: #18181b;
       border: 1px solid #27272a;
       border-radius: 8px;
-      padding: 12px 16px;
-      cursor: pointer;
+      padding: 0;
       transition: border-color 0.15s;
     }
-    .component-item:hover {
+    .component-item:has(.component-toggle:hover) {
       border-color: var(--accent);
     }
     .component-item.expanded {
       border-color: var(--accent);
+    }
+    .component-toggle {
+      display: block;
+      width: 100%;
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
     }
     .selector {
       font-family: monospace;
@@ -166,9 +178,10 @@ interface ProviderEntry {
       color: #71717a;
     }
     .inline-detail {
-      margin-top: 12px;
-      padding-top: 12px;
+      padding: 0 16px 12px;
       border-top: 1px solid #27272a;
+      margin-top: 0;
+      padding-top: 12px;
     }
     .prop-list {
       list-style: none;
@@ -290,15 +303,26 @@ export class ComponentTree {
       this.allProviders.set(providers);
       const sel = this.selected();
       if (sel) {
-        this.selectedProviders.set(providers.filter((p) => p.file === sel.file));
+        const refreshed = comps.find((c) => c.selector === sel.selector);
+        if (refreshed) {
+          this.selected.set(refreshed);
+          this.selectedProviders.set(providers.filter((p) => p.file === refreshed.file));
+        } else {
+          this.selected.set(null);
+          this.selectedProviders.set([]);
+        }
       }
     } finally {
       this.loading.set(false);
     }
   }
 
+  isSelected(comp: ComponentInfo): boolean {
+    return this.selected()?.selector === comp.selector;
+  }
+
   select(comp: ComponentInfo) {
-    if (this.selected() === comp) {
+    if (this.isSelected(comp)) {
       this.selected.set(null);
       this.selectedProviders.set([]);
       return;
