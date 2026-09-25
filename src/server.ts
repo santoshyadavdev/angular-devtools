@@ -5,6 +5,7 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { initDevframe } from 'devframe/initiate';
 import ngDevtools from '@santoshyadavdev/ng-devtools/devframe';
@@ -12,12 +13,13 @@ import ngDevtools from '@santoshyadavdev/ng-devtools/devframe';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+const server = createServer(app);
 const angularApp = new AngularNodeAppEngine();
 
 const auth = process.env['NG_DEVTOOLS_AUTH'] === 'true';
 const devtools = initDevframe(ngDevtools, {
   base: '/__ng-devtools/',
-  ws: false,
+  server,
   auth,
   allowedOrigins: false,
 });
@@ -50,11 +52,7 @@ app.use((req, res, next) => {
  */
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
   const port = process.env['PORT'] || 4000;
-  app.listen(port, (error) => {
-    if (error) {
-      throw error;
-    }
-
+  server.listen(port, () => {
     console.log(`Node Express server listening on http://localhost:${port}`);
   });
 }
