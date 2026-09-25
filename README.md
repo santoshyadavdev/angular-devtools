@@ -170,6 +170,63 @@ createDevtoolsPopup();
 
 This adds a purple FAB button (bottom-right) that opens the full devtools UI in an iframe. Supports three dock modes (float, bottom, right), dragging, resizing, and persists position via localStorage. The popup is automatically loaded in development when using the demo app.
 
+## NativeScript
+
+The same devtools work inside a NativeScript Angular app. The app has no DOM, so a
+separate overlay walks the native view tree through Angular's debug API and reports
+over a WebSocket to a devtools server running on your machine. The component tree,
+signal graph, injector tree (including environment injectors and their providers),
+the highlight tool and the MCP surface all work; the source scanners run against
+the app's `src/`.
+
+### Set up an app
+
+```sh
+npm install @santoshyadavdev/ng-devtools @valor/nativescript-websockets
+```
+
+```ts
+// src/polyfills.ts — first import, so the runtime has a WebSocket global
+import '@valor/nativescript-websockets';
+```
+
+```ts
+// src/main.ts — before runNativeScriptAngularApp()
+import { initNativeScriptOverlay } from '@santoshyadavdev/ng-devtools/overlay-nativescript';
+
+if (__DEV__) {
+  initNativeScriptOverlay();
+}
+```
+
+`initNativeScriptOverlay()` must run before Angular bootstraps: the DI inspector
+relies on Angular's injector profiler, which Angular only wires while it creates
+the platform. The overlay connects to `http://localhost:9999/` on the iOS
+simulator and `http://10.0.2.2:9999/` on the Android emulator; pass
+`{ baseURL }` for a physical device, and allow plain HTTP to that address in
+`Info.plist` / `AndroidManifest.xml`.
+
+### Run the devtools server
+
+```sh
+cd my-nativescript-app
+npx @santoshyadavdev/ng-devtools dev --host 0.0.0.0 --no-auth
+```
+
+Then open `http://localhost:9999/` for the UI, or point an MCP client at
+`http://localhost:9999/__mcp`.
+
+### Example app
+
+`app-nativescript/` is a `ns create --ng` project wired up this way, with a small
+showcase component (signals, a computed, an effect and a component-level
+provider). Tested on the iOS simulator; Android has not been verified yet.
+
+```sh
+pnpm devtools:nativescript   # devtools server scanning app-nativescript/src
+cd app-nativescript && ns debug ios --no-hmr
+```
+
 ## Demo App
 
 The repository includes a demo Angular app (`src/`) that showcases the devtools with a product catalog built using `@ngrx/signals`:

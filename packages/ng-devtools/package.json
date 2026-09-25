@@ -11,7 +11,8 @@
     ".": "./src/devframe.ts",
     "./devframe": "./src/devframe.ts",
     "./overlay": "./src/overlay.ts",
-    "./popup": "./src/popup.ts"
+    "./popup": "./src/popup.ts",
+    "./overlay-nativescript": "./src/overlay-nativescript.ts"
   },
   "files": [
     "src",
@@ -24,7 +25,8 @@
     "devframe",
     "signals",
     "dependency-injection",
-    "mcp"
+    "mcp",
+    "nativescript"
   ],
   "dependencies": {
     "@valibot/to-json-schema": "^1.8.0",
