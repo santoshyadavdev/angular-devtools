@@ -2,7 +2,7 @@
 
 # Compiled output
 /dist
-/packages/ng-devtools/dist
+/packages/*/dist
 /tmp
 /out-tsc
 /bazel-out
