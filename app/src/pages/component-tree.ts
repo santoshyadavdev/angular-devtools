@@ -40,61 +40,54 @@ interface ProviderEntry {
     } @else {
       <ul class="component-list" role="list">
         @for (comp of filtered(); track comp.selector) {
-          <li class="component-item" (click)="select(comp)">
+          <li class="component-item" [class.expanded]="selected() === comp" (click)="select(comp)">
             <div class="selector">&lt;{{ comp.selector }}&gt;</div>
             <div class="file">{{ comp.file }}</div>
-            @if (comp.inputs.length) {
-              <div class="io">
-                <span class="label">Inputs:</span>
-                {{ comp.inputs.join(', ') }}
-              </div>
-            }
-            @if (comp.outputs.length) {
-              <div class="io">
-                <span class="label">Outputs:</span>
-                {{ comp.outputs.join(', ') }}
+            @if (selected() === comp) {
+              <div class="inline-detail">
+                <dl>
+                  <dt>File</dt>
+                  <dd>{{ comp.file }}</dd>
+                  <dt>Standalone</dt>
+                  <dd>{{ comp.isStandalone ? 'Yes' : 'No' }}</dd>
+                </dl>
+                @if (comp.inputs.length) {
+                  <h4>Inputs</h4>
+                  <ul class="prop-list" role="list">
+                    @for (inp of comp.inputs; track inp) {
+                      <li class="prop-chip input-chip">{{ inp }}</li>
+                    }
+                  </ul>
+                }
+                @if (comp.outputs.length) {
+                  <h4>Outputs</h4>
+                  <ul class="prop-list" role="list">
+                    @for (out of comp.outputs; track out) {
+                      <li class="prop-chip output-chip">{{ out }}</li>
+                    }
+                  </ul>
+                }
+                @if (selectedProviders().length) {
+                  <h4>Injected Providers</h4>
+                  <ul class="provider-list" role="list">
+                    @for (p of selectedProviders(); track p.token + p.line) {
+                      <li class="provider-item">
+                        <span class="provider-token">{{ p.token }}</span>
+                        <span class="provider-type">{{ p.type }}</span>
+                        @if (p.source && p.source !== 'class' && p.source !== 'providers array') {
+                          <span class="provider-source">→ {{ p.source }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="no-providers">No injected providers detected.</p>
+                }
               </div>
             }
           </li>
         }
       </ul>
-    }
-
-    @if (selected()) {
-      <aside class="detail">
-        <h3>&lt;{{ selected()!.selector }}&gt;</h3>
-        <dl>
-          <dt>File</dt>
-          <dd>{{ selected()!.file }}</dd>
-          @if (selected()!.inputs.length) {
-            <dt>Inputs</dt>
-            <dd>{{ selected()!.inputs.join(', ') }}</dd>
-          }
-          @if (selected()!.outputs.length) {
-            <dt>Outputs</dt>
-            <dd>{{ selected()!.outputs.join(', ') }}</dd>
-          }
-          <dt>Standalone</dt>
-          <dd>{{ selected()!.isStandalone ? 'Yes' : 'No' }}</dd>
-        </dl>
-
-        @if (selectedProviders().length) {
-          <h4>Injected Providers</h4>
-          <ul class="provider-list" role="list">
-            @for (p of selectedProviders(); track p.token + p.line) {
-              <li class="provider-item">
-                <span class="provider-token">{{ p.token }}</span>
-                <span class="provider-type">{{ p.type }}</span>
-                @if (p.source && p.source !== 'class' && p.source !== 'providers array') {
-                  <span class="provider-source">→ {{ p.source }}</span>
-                }
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="no-providers">No injected providers detected.</p>
-        }
-      </aside>
     }
   `,
   styles: `
@@ -150,6 +143,9 @@ interface ProviderEntry {
     .component-item:hover {
       border-color: var(--accent);
     }
+    .component-item.expanded {
+      border-color: var(--accent);
+    }
     .selector {
       font-family: monospace;
       font-size: 15px;
@@ -169,17 +165,32 @@ interface ProviderEntry {
     .io .label {
       color: #71717a;
     }
-    .detail {
-      margin-top: 16px;
-      padding: 16px;
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 8px;
+    .inline-detail {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #27272a;
     }
-    .detail h3 {
-      font-family: monospace;
-      color: var(--accent);
+    .prop-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
       margin-bottom: 12px;
+    }
+    .prop-chip {
+      font-family: monospace;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .input-chip {
+      background: #1e3a5f;
+      color: #93c5fd;
+    }
+    .output-chip {
+      background: #3b1d1d;
+      color: #fca5a5;
     }
     dl {
       display: grid;
@@ -287,6 +298,11 @@ export class ComponentTree {
   }
 
   select(comp: ComponentInfo) {
+    if (this.selected() === comp) {
+      this.selected.set(null);
+      this.selectedProviders.set([]);
+      return;
+    }
     this.selected.set(comp);
     this.selectedProviders.set(this.allProviders().filter((p) => p.file === comp.file));
     const client = this.rpc();
