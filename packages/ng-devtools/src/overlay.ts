@@ -1,4 +1,18 @@
 import { connectDevframe } from 'devframe/client';
+import {
+  injectorTreeFor,
+  ngrxStoreStateFrom,
+  safeSerialize,
+  signalGraphFor,
+  walkComponentTree,
+  type AngularDebugApi as DebugApi,
+  type CollectedInjector,
+  type CollectedSignalGraph,
+  type ComponentTreeNode,
+  type HostAdapter,
+} from './overlay-core.ts';
+
+export type { ComponentTreeNode } from './overlay-core.ts';
 
 let highlightEl: HTMLElement | null = null;
 
@@ -63,11 +77,14 @@ export async function initOverlay(options: { baseURL?: string | string[] } = {})
   };
 }
 
-export interface AngularDebugApi {
-  getComponent(el: Element): unknown;
-  getInjector?(el: Element): unknown;
-  ɵgetSignalGraph?(injector: unknown): unknown;
-}
+export type AngularDebugApi = DebugApi<Element>;
+
+const domAdapter: HostAdapter<Element> = {
+  children: (el) => Array.from(el.children),
+  id: generateId,
+  tagName: (el) => el.tagName.toLowerCase(),
+  selector: (el) => el.tagName.toLowerCase(),
+};
 
 function findAngularElements(): Element[] {
   const versionEls = Array.from(document.querySelectorAll('[ng-version]'));
@@ -86,7 +103,7 @@ export function collectComponentTree() {
   );
 
   // Use Angular's debug utilities if available
-  const ng = (window as unknown as { ng?: AngularDebugApi }).ng;
+  const ng = getNg();
   if (ng?.getComponent) {
     if (roots.length > 0) {
       for (const root of roots) {
@@ -105,36 +122,8 @@ export function collectComponentTree() {
   return nodes;
 }
 
-export interface ComponentTreeNode {
-  id: string;
-  selector: string;
-  tagName: string;
-  children: ComponentTreeNode[];
-  inputs?: Record<string, unknown>;
-}
-
 export function walkAngularTree(el: Element, out: ComponentTreeNode[], ng: AngularDebugApi) {
-  const component = ng.getComponent(el);
-
-  if (component) {
-    const node: ComponentTreeNode = {
-      id: generateId(el),
-      selector: el.tagName.toLowerCase(),
-      tagName: el.tagName.toLowerCase(),
-      children: [],
-      inputs: tryGetInputs(component),
-    };
-
-    for (const child of el.children) {
-      walkAngularTree(child, node.children, ng);
-    }
-
-    out.push(node);
-  } else {
-    for (const child of el.children) {
-      walkAngularTree(child, out, ng);
-    }
-  }
+  walkComponentTree(el, out, ng, domAdapter);
 }
 
 function walkDom(el: Element, out: ComponentTreeNode[]) {
@@ -157,36 +146,6 @@ function walkDom(el: Element, out: ComponentTreeNode[]) {
     for (const child of el.children) {
       walkDom(child, out);
     }
-  }
-}
-
-function isSignal(val: unknown): val is () => unknown {
-  if (typeof val !== 'function') return false;
-  if (val.name === 'signalValueFn') return true;
-  const symbols = Object.getOwnPropertySymbols(val);
-  return symbols.some((s) => s.description === 'SIGNAL' || s.toString().includes('SIGNAL'));
-}
-
-function tryGetInputs(component: unknown): Record<string, unknown> | undefined {
-  if (!component || typeof component !== 'object') return undefined;
-  try {
-    const inputs: Record<string, unknown> = {};
-    const comp = component as Record<string, unknown>;
-    for (const key of Object.keys(comp)) {
-      const val = comp[key];
-      if (isSignal(val)) {
-        try {
-          inputs[key] = serializeValue(val());
-        } catch {
-          // skip
-        }
-      } else if (typeof val !== 'function') {
-        inputs[key] = serializeValue(val);
-      }
-    }
-    return Object.keys(inputs).length > 0 ? inputs : undefined;
-  } catch {
-    return undefined;
   }
 }
 
@@ -228,190 +187,39 @@ function clearHighlight() {
 
 // --- Signal Graph collection using Angular's debug API ---
 
-function getNg(): any {
-  return (window as any).ng;
+function getNg(): AngularDebugApi | undefined {
+  return (window as unknown as { ng?: AngularDebugApi }).ng;
 }
 
-function collectSignalGraph() {
+function componentRoots(): Element[] {
+  return Array.from(document.querySelectorAll('[ng-version], [_nghost-ng-c]'));
+}
+
+function collectSignalGraph(): CollectedSignalGraph | null {
   const ng = getNg();
   if (!ng?.ɵgetSignalGraph) return null;
 
   // Get the first component root and its injector
-  const roots = document.querySelectorAll('[ng-version], [_nghost-ng-c]');
-  for (const root of roots) {
-    const graph = getSignalGraphForElement(root);
+  for (const root of componentRoots()) {
+    const graph = signalGraphFor(ng, root, domAdapter);
     if (graph) return graph;
   }
   return null;
 }
 
-function getSignalGraphForElement(el: Element) {
-  const ng = getNg();
-  if (!ng?.ɵgetSignalGraph || !ng?.getInjector) return null;
-
-  try {
-    const injector = ng.getInjector(el);
-    if (!injector) return null;
-
-    const raw = ng.ɵgetSignalGraph(injector);
-    if (!raw) return null;
-
-    return {
-      nodes: raw.nodes.map((n: any) => ({
-        id: n.id,
-        kind: n.kind ?? 'unknown',
-        label: n.label,
-        epoch: n.epoch ?? 0,
-        value: serializeValue(n.value),
-        watched: n.watched ?? false,
-      })),
-      edges: raw.edges ?? [],
-      componentSelector: el.tagName.toLowerCase(),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function serializeValue(val: unknown): unknown {
-  if (val === undefined || val === null) return val;
-  if (typeof val === 'function') return `[Function: ${val.name || 'anonymous'}]`;
-  if (typeof val === 'symbol') return val.toString();
-  if (typeof val === 'bigint') return val.toString();
-  if (typeof val === 'object') {
-    try {
-      return JSON.parse(JSON.stringify(val));
-    } catch {
-      return String(val);
-    }
-  }
-  return val;
-}
-
 // --- DI Injector Tree collection ---
-
-interface CollectedInjector {
-  injector: { id: string; type: string; name: string; providerCount: number };
-  providers: { token: string; type: string; isViewProvider: boolean }[];
-  children: CollectedInjector[];
-}
 
 function collectInjectorTree(): CollectedInjector[] {
   const ng = getNg();
   if (!ng?.getInjector || !ng?.ɵgetInjectorMetadata) return [];
 
   const roots: CollectedInjector[] = [];
-  const visited = new WeakSet();
-  const componentEls = document.querySelectorAll('[ng-version], [_nghost-ng-c]');
-
-  for (const el of componentEls) {
-    try {
-      const injector = ng.getInjector(el);
-      if (!injector || visited.has(injector)) continue;
-      visited.add(injector);
-
-      const node = serializeInjectorNode(ng, injector, el, visited);
-      if (node) roots.push(node);
-    } catch {
-      // skip
-    }
+  const visited = new WeakSet<object>();
+  for (const el of componentRoots()) {
+    const node = injectorTreeFor(ng, el, domAdapter, visited);
+    if (node) roots.push(node);
   }
   return roots;
-}
-
-function serializeInjectorNode(
-  ng: any,
-  injector: any,
-  el: Element,
-  visited: WeakSet<object>,
-): CollectedInjector | null {
-  try {
-    const metadata = ng.ɵgetInjectorMetadata?.(injector);
-    if (!metadata) return null;
-
-    const providers = getInjectorProvidersList(ng, injector);
-    const children: CollectedInjector[] = [];
-
-    // Walk child components
-    for (const child of el.querySelectorAll(':scope > *')) {
-      try {
-        const childInjector = ng.getInjector(child);
-        if (!childInjector || visited.has(childInjector) || childInjector === injector) continue;
-        visited.add(childInjector);
-        const childNode = serializeInjectorNode(ng, childInjector, child, visited);
-        if (childNode) children.push(childNode);
-      } catch {
-        // skip
-      }
-    }
-
-    return {
-      injector: {
-        id: `inj-${el.tagName.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`,
-        type: metadata.type ?? 'unknown',
-        name:
-          metadata.type === 'element'
-            ? el.tagName.toLowerCase()
-            : (metadata.source?.toString?.() ?? 'Environment'),
-        providerCount: providers.length,
-      },
-      providers,
-      children,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getInjectorProvidersList(ng: any, injector: any) {
-  if (!ng.ɵgetInjectorProviders) return [];
-  try {
-    const raw = ng.ɵgetInjectorProviders(injector) ?? [];
-    return raw.map((p: any) => ({
-      token: p.token?.name ?? p.token?.toString?.() ?? 'unknown',
-      type: inferProviderType(p),
-      isViewProvider: p.isViewProvider ?? false,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function inferProviderType(p: any): string {
-  if (p.useClass) return 'class';
-  if (p.useValue !== undefined) return 'value';
-  if (p.useFactory) return 'factory';
-  if (p.useExisting) return 'existing';
-  return 'class';
-}
-
-function getProvidersForElement(el: Element) {
-  const ng = getNg();
-  if (!ng?.getInjector || !ng?.ɵgetInjectorProviders) return null;
-
-  try {
-    const injector = ng.getInjector(el);
-    if (!injector) return null;
-
-    const providers = getInjectorProvidersList(ng, injector);
-    const resolutionPath = ng.ɵgetInjectorResolutionPath?.(injector) ?? [];
-
-    return {
-      providers,
-      resolutionPath: resolutionPath.map((inj: any) => {
-        const meta = ng.ɵgetInjectorMetadata?.(inj);
-        return {
-          type: meta?.type ?? 'unknown',
-          name:
-            meta?.type === 'element'
-              ? (meta.source?.tagName?.toLowerCase?.() ?? 'element')
-              : 'environment',
-        };
-      }),
-    };
-  } catch {
-    return null;
-  }
 }
 
 // --- NgRx Store state collection via Redux DevTools protocol ---
@@ -453,43 +261,7 @@ function collectNgrxState(): {
 function getNgrxStoreState(): unknown | undefined {
   const ng = getNg();
   if (!ng?.getInjector) return undefined;
-
-  const roots = document.querySelectorAll('[ng-version], [_nghost-ng-c]');
-  for (const root of roots) {
-    try {
-      const injector = ng.getInjector(root);
-      if (!injector) continue;
-
-      // Try to get the NgRx Store service from the injector
-      // NgRx Store has a `select` method and an internal `state` observable
-      const allProviders = ng.ɵgetInjectorProviders?.(injector) ?? [];
-      for (const p of allProviders) {
-        const token = p.token;
-        if (!token) continue;
-
-        // Check if this is the NgRx Store token
-        const tokenName = token.name ?? token.toString?.() ?? '';
-        if (tokenName === 'Store') {
-          try {
-            const store = injector.get(token);
-            if (!store || typeof store.subscribe !== 'function') continue;
-            // Subscribe once to capture the synchronous initial emission
-            let snapshot: unknown;
-            const sub = store.subscribe((val: unknown) => {
-              snapshot = val;
-            });
-            sub.unsubscribe();
-            if (snapshot !== undefined) return safeSerialize(snapshot);
-          } catch {
-            // not resolvable at this injector level
-          }
-        }
-      }
-    } catch {
-      // skip
-    }
-  }
-  return undefined;
+  return ngrxStoreStateFrom(ng, componentRoots());
 }
 
 function subscribeToReduxDevTools() {
@@ -563,15 +335,6 @@ function captureAction(action: unknown) {
   ngrxActionLog.push(entry);
   if (ngrxActionLog.length > MAX_ACTION_LOG) {
     ngrxActionLog.splice(0, ngrxActionLog.length - MAX_ACTION_LOG);
-  }
-}
-
-function safeSerialize(val: unknown): unknown {
-  if (val === undefined || val === null) return val;
-  try {
-    return JSON.parse(JSON.stringify(val));
-  } catch {
-    return String(val);
   }
 }
 
