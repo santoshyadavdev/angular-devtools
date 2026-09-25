@@ -114,6 +114,10 @@ importers:
       valibot:
         specifier: ^1.5.0
         version: 1.5.0(typescript@6.0.3)
+    devDependencies:
+      '@santoshyadavdev/ng-devtools-assets':
+        specifier: workspace:*
+        version: link:../ng-devtools-assets
 
   packages/ng-devtools-assets: {}
 

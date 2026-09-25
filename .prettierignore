@@ -5,3 +5,7 @@ pnpm-lock.yaml
 extension/ui
 packages/ng-devtools-assets/dist
 docs/privacy-policy.html
+app-nativescript/platforms
+app-nativescript/hooks
+app-nativescript/App_Resources
+app-nativescript/package-lock.json

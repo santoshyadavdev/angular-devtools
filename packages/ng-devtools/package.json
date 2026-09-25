@@ -11,7 +11,8 @@
     ".": "./src/devframe.ts",
     "./devframe": "./src/devframe.ts",
     "./overlay": "./src/overlay.ts",
-    "./popup": "./src/popup.ts"
+    "./popup": "./src/popup.ts",
+    "./overlay-nativescript": "./src/overlay-nativescript.ts"
   },
   "files": [
     "src",
@@ -24,13 +25,17 @@
     "devframe",
     "signals",
     "dependency-injection",
-    "mcp"
+    "mcp",
+    "nativescript"
   ],
   "dependencies": {
     "@valibot/to-json-schema": "^1.8.0",
     "cac": "^7.0.0",
     "devframe": "^1.0.0",
     "valibot": "^1.5.0"
+  },
+  "devDependencies": {
+    "@santoshyadavdev/ng-devtools-assets": "workspace:*"
   },
   "peerDependencies": {
     "@devframes/agentic": "^1.0.0"
