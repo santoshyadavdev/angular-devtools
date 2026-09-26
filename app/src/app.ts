@@ -7,8 +7,8 @@ import { SignalInspector } from './pages/signal-inspector';
 import { DiInspector } from './pages/di-inspector';
 import { StoreInspector } from './pages/store-inspector';
 import { FormsInspector } from './pages/forms-inspector';
-
-type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'store' | 'forms';
+import { PipesInspector } from './pages/pipes-inspector';
+import type { Tab, Tabs } from './types/tab.types';
 
 @Component({
   selector: 'app-root',
@@ -20,6 +20,7 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
     DiInspector,
     StoreInspector,
     FormsInspector,
+    PipesInspector,
   ],
   template: `
     <header>
@@ -80,6 +81,9 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
         }
         @case ('forms') {
           <app-forms-inspector [rpc]="rpc()" />
+        }
+        @case ('pipes') {
+          <app-pipes-inspector [rpc]="rpc()" />
         }
       }
     </main>
@@ -163,14 +167,15 @@ type Tab = 'dashboard' | 'components' | 'routes' | 'signals' | 'injectors' | 'st
   `,
 })
 export class App implements OnInit, OnDestroy {
-  readonly tabs = [
-    { id: 'dashboard' as Tab, label: 'Dashboard' },
-    { id: 'components' as Tab, label: 'Components' },
-    { id: 'routes' as Tab, label: 'Routes' },
-    { id: 'signals' as Tab, label: 'Signals' },
-    { id: 'injectors' as Tab, label: 'Injectors' },
-    { id: 'store' as Tab, label: 'Store' },
-    { id: 'forms' as Tab, label: 'Forms' },
+  readonly tabs: Tabs[] = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'components', label: 'Components' },
+    { id: 'routes', label: 'Routes' },
+    { id: 'signals', label: 'Signals' },
+    { id: 'injectors', label: 'Injectors' },
+    { id: 'store', label: 'Store' },
+    { id: 'forms', label: 'Forms' },
+    { id: 'pipes', label: 'Pipes' },
   ];
 
   tab = signal<Tab>('dashboard');

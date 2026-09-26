@@ -14,7 +14,7 @@ interface ExampleLink {
   template: `
     <section>
       <p class="lead">
-        Five pages, each built to fill one DevTools inspector. Open the popup with the button in the
+        Six pages, each built to fill one DevTools inspector. Open the popup with the button in the
         corner, then work through them.
       </p>
 
@@ -140,6 +140,13 @@ export class ExamplesOverview {
       tab: 'Forms',
       title: 'Every kind of form',
       blurb: 'Signal Forms, reactive and template-driven forms with failing validators.',
+    },
+    {
+      path: 'pipes',
+      tab: 'Pipes',
+      title: 'Pure, impure and module',
+      blurb:
+        'A pure formatting pipe, an impure one that recomputes every tick, and a standalone: false one declared through an NgModule.',
     },
   ];
 }

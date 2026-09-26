@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, input, signal, effect, computed } from '@angular/core';
 import type { DevframeRpcClient } from 'devframe/client';
 
@@ -30,6 +31,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 @Component({
   selector: 'app-di-inspector',
+  imports: [NgTemplateOutlet],
   template: `
     <div class="toolbar">
       <input
