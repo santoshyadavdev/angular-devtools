@@ -8,17 +8,21 @@ import { ExamplePage } from './example-page';
   template: `
     <app-example-page heading="Nested routes" tab="Routes">
       <ng-container lead>
-        This page has children of its own, and one of those has grandchildren. The configuration
-        also carries route <code>data</code> and a redirect, so the Routes tab shows more than a
-        flat list of paths.
+        This page has children of its own, route <code>data</code>, a redirect, a route with a param
+        and a resolver, a guard that redirects, a guard that blocks and a resolver that fails.
       </ng-container>
       <ng-container hint>
-        Every path below is read from source, including the ones you have not visited.
+        Click through the links and watch the current route and the navigation timeline in the
+        Routes tab.
       </ng-container>
 
       <nav class="sub" aria-label="Route example">
         <a routerLink="summary" routerLinkActive="active" ariaCurrentWhenActive="page">Summary</a>
         <a routerLink="details" routerLinkActive="active" ariaCurrentWhenActive="page">Details</a>
+        <a routerLink="users/7" routerLinkActive="active" ariaCurrentWhenActive="page">User 7</a>
+        <a routerLink="admin" routerLinkActive="active" ariaCurrentWhenActive="page">Admin</a>
+        <a routerLink="locked" routerLinkActive="active" ariaCurrentWhenActive="page">Locked</a>
+        <a routerLink="broken" routerLinkActive="active" ariaCurrentWhenActive="page">Broken</a>
       </nav>
 
       <div class="outlet">
@@ -29,6 +33,7 @@ import { ExamplePage } from './example-page';
   styles: `
     .sub {
       display: flex;
+      flex-wrap: wrap;
       gap: 4px;
     }
     .sub a {

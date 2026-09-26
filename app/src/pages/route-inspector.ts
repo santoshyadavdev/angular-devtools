@@ -1,5 +1,6 @@
 import { Component, input, signal, effect, computed } from '@angular/core';
 import type { DevframeRpcClient } from 'devframe/client';
+import { LiveRoute } from './live-route';
 
 interface RouteInfo {
   path: string;
@@ -12,7 +13,11 @@ interface RouteInfo {
 
 @Component({
   selector: 'app-route-inspector',
+  imports: [LiveRoute],
   template: `
+    <app-live-route [rpc]="rpc()" />
+
+    <h2 class="config-heading">Route config</h2>
     <div class="toolbar">
       <input
         type="text"
@@ -60,6 +65,11 @@ interface RouteInfo {
     }
   `,
   styles: `
+    .config-heading {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #e4e4e7;
+    }
     .toolbar {
       display: flex;
       gap: 8px;
@@ -91,7 +101,7 @@ interface RouteInfo {
       background: #52525b;
     }
     .muted {
-      color: #71717a;
+      color: #a1a1aa;
       font-size: 14px;
     }
     table {
@@ -107,7 +117,7 @@ interface RouteInfo {
       text-align: left;
       padding: 8px 12px;
       background: #18181b;
-      color: #71717a;
+      color: #a1a1aa;
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -131,7 +141,7 @@ interface RouteInfo {
     }
     .file {
       font-size: 12px;
-      color: #71717a;
+      color: #a1a1aa;
     }
   `,
 })

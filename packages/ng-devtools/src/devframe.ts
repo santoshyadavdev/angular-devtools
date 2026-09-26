@@ -19,6 +19,28 @@ import {
   type FormsState,
   type InspectFormsArgs,
 } from './rpc/forms-tools.ts';
+import {
+  currentRouter,
+  expireRouterPages,
+  explainNavigationText,
+  inspectRouteText,
+  isRouterReport,
+  mergeRouterReport,
+  routerResourceText,
+  type RouterPage,
+  type RouterState,
+} from './rpc/router-tools.ts';
+import {
+  explainRenderModeText,
+  exportNavigationText,
+  lintRoutes,
+  lintRoutesText,
+  listRoutesText,
+  matchUrl,
+  routerConfigText,
+} from './rpc/router-config-tools.ts';
+import { extractRoutes } from './rpc/get-routes.ts';
+import { scanServerRoutes } from './rpc/server-routes.ts';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -108,9 +130,129 @@ const ngDevtools = defineDevframe({
       },
     });
 
+    const routerPages = new Map<string, RouterPage>();
+    const routerState = await my.rpc.sharedState('router', {
+      initialValue: { pages: [] } as RouterState,
+    });
+
+    const applyRouter = (next: RouterState) =>
+      routerState.mutate((draft) => {
+        draft.pages = next.pages;
+      });
+
+    my.rpc.register({
+      name: 'push-router',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (report: unknown) => {
+        if (!isRouterReport(report)) return;
+        try {
+          applyRouter(mergeRouterReport(routerPages, report));
+        } catch {
+          routerPages.delete(report.pageId);
+        }
+      },
+    });
+
+    const pendingActions = new Map<string, (result: unknown) => void>();
+    let actionSeq = 0;
+
+    const requestRouterAction = (pageId: string | undefined, request: unknown) =>
+      new Promise<unknown>((resolve) => {
+        const requestId = `a${++actionSeq}`;
+        const timer = setTimeout(() => {
+          pendingActions.delete(requestId);
+          resolve({ error: 'No page answered within 15s. Is the app open in a browser?' });
+        }, 15_000);
+        timer.unref?.();
+        pendingActions.set(requestId, (result) => {
+          clearTimeout(timer);
+          pendingActions.delete(requestId);
+          resolve(result);
+        });
+        void my.rpc.broadcast({
+          method: 'router-action',
+          args: [{ requestId, pageId, request }],
+          optional: true,
+        });
+      });
+
+    my.rpc.register({
+      name: 'router-action-result',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (message: { requestId?: unknown; result?: unknown }) => {
+        if (typeof message?.requestId !== 'string') return;
+        pendingActions.get(message.requestId)?.(message.result);
+      },
+    });
+
+    my.rpc.register({
+      name: 'request-router-action',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (message: { pageId?: string; request?: unknown }) =>
+        requestRouterAction(
+          typeof message?.pageId === 'string' ? message.pageId : undefined,
+          message?.request,
+        ),
+    });
+
+    const pageFor = (pageId: unknown) => {
+      const state = routerState.value() as RouterState;
+      return typeof pageId === 'string'
+        ? state.pages.find((p) => p.pageId === pageId)
+        : (state.pages.find((p) => p.snapshot) ?? state.pages[0]);
+    };
+
+    my.rpc.register({
+      name: 'router-lint',
+      type: 'query',
+      jsonSerializable: true,
+      handler: (pageId: unknown) => {
+        const page = pageFor(pageId);
+        return page?.config ? lintRoutes(page) : [];
+      },
+    });
+
+    my.rpc.register({
+      name: 'router-match',
+      type: 'query',
+      jsonSerializable: true,
+      handler: (message: { pageId?: unknown; url?: unknown }) => {
+        const page = pageFor(message?.pageId);
+        if (!page?.config || typeof message?.url !== 'string') return null;
+        return matchUrl(page.config, message.url.slice(0, 2000));
+      },
+    });
+
+    my.rpc.register({
+      name: 'router-export',
+      type: 'query',
+      jsonSerializable: true,
+      handler: (message: { pageId?: unknown; id?: unknown }) =>
+        exportNavigationText(routerState.value() as RouterState, {
+          page: typeof message?.pageId === 'string' ? message.pageId : undefined,
+          id: typeof message?.id === 'number' ? message.id : undefined,
+        }),
+    });
+
+    my.rpc.register({
+      name: 'forget-router-page',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (pageId: string) => {
+        if (typeof pageId === 'string' && routerPages.delete(pageId)) {
+          applyRouter(currentRouter(routerPages));
+        }
+      },
+    });
+
     const expiry = setInterval(() => {
       const next = expirePages(formPages);
       if (next) applyForms(next);
+      const nextRouter = expireRouterPages(routerPages);
+      if (nextRouter) applyRouter(nextRouter);
     }, 5000);
     expiry.unref?.();
 
@@ -241,6 +383,15 @@ const ngDevtools = defineDevframe({
       read: () => ({ text: formsResourceText(formsState.value() as FormsState) }),
     });
 
+    ctx.agent.registerResource({
+      id: 'ng-devtools:router',
+      name: 'Angular Router',
+      description:
+        'The active route tree (params, data, guards, resolvers) and recent navigations of each connected page. Empty when no page is connected.',
+      mimeType: 'application/json',
+      read: () => ({ text: routerResourceText(routerState.value() as RouterState) }),
+    });
+
     // Agent tools
     ctx.agent.registerTool({
       id: 'ng-devtools:highlight',
@@ -333,6 +484,252 @@ const ngDevtools = defineDevframe({
         const scope = args.selector ? `, not filtered to \`${args.selector}\`` : '';
         return {
           markdown: `This is the injector tree for the whole page${scope}:\n\n${JSON.stringify(roots, null, 2)}`,
+        };
+      },
+    });
+
+    const noRouter = `No router state has been reported. Live data needs a page: connect through the MCP endpoint of the server that runs the app, with the app open in a browser. The stdio server has no page attached and only ever reports this.`;
+    const pageProperty = {
+      type: 'string',
+      description: 'Page id, when more than one tab reports. Defaults to the most recent.',
+    };
+
+    const defaultPageId = () => {
+      const state = routerState.value() as RouterState;
+      return (state.pages.find((p) => p.snapshot) ?? state.pages[0])?.pageId;
+    };
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:inspect-route',
+      description:
+        'The route the running page is on right now: URL (and the browser URL when it differs), query params, fragment, document title, any navigation in flight, the active route tree (component, params and data with where each value comes from, own or inherited title, guards, resolvers) and the outlet tree with router-bound inputs. Pass `selector` (a component class, element tag or link text) to see the route a component was rendered for, or whether a link counts as active. Secret-looking values are redacted.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          page: pageProperty,
+          selector: {
+            type: 'string',
+            description:
+              'Component class name, element tag or link text to explain instead of the whole route.',
+          },
+        },
+      },
+      handler: async (args: { page?: string; selector?: string }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        return { markdown: inspectRouteText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-navigation',
+      description:
+        'Recent navigations on the running page, newest first, each as a full story: from and to, who started it (link, code, back/forward), extras, redirect chain and loops, per-phase timing, guards and resolvers (with each verdict when instrumentation is on), lazy loads, reused components, HTTP requests, scroll, title, and the cancel or error reason with a plain-language meaning and the NG0 error explained. Use it for "why did this navigation not work", "why was I redirected" or, with perf, "why is navigation slow".',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          page: pageProperty,
+          url: {
+            type: 'string',
+            description: 'Only navigations whose URL or final URL contains this text.',
+          },
+          id: { type: 'integer', description: 'Only the navigation with this id.' },
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 50,
+            description: 'How many navigations to return (default 5, at most 50).',
+          },
+          perf: {
+            type: 'boolean',
+            description: 'Summarize the slowest navigations and preloads instead.',
+          },
+        },
+      },
+      handler: async (args: {
+        page?: string;
+        url?: string;
+        limit?: number;
+        perf?: boolean;
+        id?: number;
+      }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        return { markdown: explainNavigationText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:list-routes',
+      description:
+        "The router's live route config (not just the active route): every route with its full path, component or redirect, lazy state, outlet, guards, resolvers, title, the source file it is declared in and an example URL, with the active routes marked. Pass `match` to predict which route a URL matches (or the nearest routes when it matches none), `audit` for the guards protecting each page, or `filter` to narrow by path or component.",
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          page: pageProperty,
+          match: {
+            type: 'string',
+            description: 'A URL such as /users/42 to match against the config.',
+          },
+          audit: { type: 'boolean', description: 'List the guards that protect each page.' },
+          filter: {
+            type: 'string',
+            description: 'Only routes whose path or component contains this text.',
+          },
+        },
+      },
+      handler: async (args: {
+        page?: string;
+        match?: string;
+        audit?: boolean;
+        filter?: string;
+      }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        let sources: { path: string; component?: string; redirectTo?: string; file: string }[] = [];
+        try {
+          sources = extractRoutes(ctx.cwd);
+        } catch {
+          sources = [];
+        }
+        return { markdown: listRoutesText(state, args, sources) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:lint-routes',
+      description:
+        "Checks the live route config for mistakes: routes after '**', a :param route shadowing a literal one, duplicate paths, empty-path redirects without pathMatch 'full', redirect cycles, deprecated class guards and canLoad, lazy chunks downloaded before canActivate rejects, missing or duplicate titles, param/input name typos, RouterLinkActive without aria-current, emails in URLs and return URLs taken from query params. Each finding says whether Angular throws, warns or stays silent, and how to fix it.",
+      safety: 'read',
+      inputSchema: { type: 'object', properties: { page: pageProperty } },
+      handler: async (args: { page?: string }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        return { markdown: lintRoutesText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:router-config',
+      description:
+        'How the router is set up on the running page: provideRouter or forRoot, Angular version, effective options with which are set and which are defaults (onSameUrlNavigation, paramsInheritanceStrategy, urlUpdateStrategy, canceledNavigationResolution, scrolling, initial navigation), enabled features (input binding, view transitions, error handler, preloading strategy, scroller, resources), strategies (location, title, reuse, URL handling), base href, hydration and whether per-guard instrumentation is on.',
+      safety: 'read',
+      inputSchema: { type: 'object', properties: { page: pageProperty } },
+      handler: async (args: { page?: string }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        return { markdown: routerConfigText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:export-navigation',
+      description:
+        'A markdown repro for one navigation (default: the latest that did not succeed): Angular version, router options and features, how it started, the full redirect chain with every detail from explain-navigation, and the relevant slice of the route config. Secret-looking values stay redacted.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: { page: pageProperty, id: { type: 'integer', description: 'Navigation id.' } },
+      },
+      handler: async (args: { page?: string; id?: number }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        return { markdown: exportNavigationText(state, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-render-mode',
+      description:
+        "Which ServerRoute (from the workspace's *.routes.server.ts) and render mode (Server, Client, Prerender) a URL gets, plus server entries that match no client route and the render mode of every client route.",
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          page: pageProperty,
+          url: { type: 'string', description: 'URL to check; defaults to the page URL.' },
+        },
+      },
+      handler: async (args: { page?: string; url?: string }) => {
+        const state = routerState.value() as RouterState;
+        let entries: ReturnType<typeof scanServerRoutes> = [];
+        try {
+          entries = scanServerRoutes(ctx.cwd);
+        } catch {
+          entries = [];
+        }
+        return { markdown: explainRenderModeText(state, entries, args) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:navigate',
+      description:
+        'Acts on the running app\'s router (development only). action "navigate" goes to `url` (same-origin, starting with "/") or to `pattern` with `params` (e.g. /users/:id with {"id":"7"}), optionally with replaceUrl or skipLocationChange, and waits for the outcome; "abort" stops the navigation in flight; "replay" re-runs navigation `id` and compares the outcome; "probe" runs the real matcher for `url` without navigating (it runs canMatch and may load lazy chunks); "instrument" turns per-guard and per-resolver recording on or off; "resolve-lazy" reads the routes of an unloaded lazy route (`routeId` from list-routes) without registering them.',
+      safety: 'action',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          page: pageProperty,
+          action: {
+            type: 'string',
+            enum: ['navigate', 'abort', 'replay', 'probe', 'instrument', 'resolve-lazy'],
+          },
+          url: { type: 'string' },
+          pattern: { type: 'string' },
+          params: { type: 'object', additionalProperties: { type: 'string' } },
+          replaceUrl: { type: 'boolean' },
+          skipLocationChange: { type: 'boolean' },
+          waitFor: { type: 'string', enum: ['navigation', 'stable'] },
+          id: { type: 'integer', description: 'Navigation id for replay.' },
+          on: { type: 'boolean', description: 'For instrument.' },
+          routeId: { type: 'string', description: 'Route id for resolve-lazy.' },
+        },
+        required: ['action'],
+      },
+      handler: async (args: {
+        page?: string;
+        action: string;
+        url?: string;
+        pattern?: string;
+        params?: Record<string, string>;
+        replaceUrl?: boolean;
+        skipLocationChange?: boolean;
+        waitFor?: 'navigation' | 'stable';
+        id?: number;
+        on?: boolean;
+        routeId?: string;
+      }) => {
+        const state = routerState.value() as RouterState;
+        if (!state.pages.length) return { markdown: noRouter };
+        const request =
+          args.action === 'navigate'
+            ? {
+                action: 'navigate',
+                url: args.url,
+                pattern: args.pattern,
+                params: args.params,
+                extras: {
+                  replaceUrl: args.replaceUrl,
+                  skipLocationChange: args.skipLocationChange,
+                },
+                waitFor: args.waitFor,
+              }
+            : args.action === 'replay'
+              ? { action: 'replay', id: args.id }
+              : args.action === 'probe'
+                ? { action: 'probe', url: args.url }
+                : args.action === 'instrument'
+                  ? { action: 'instrument', on: args.on !== false }
+                  : args.action === 'resolve-lazy'
+                    ? { action: 'resolve-lazy', id: args.routeId }
+                    : { action: args.action };
+        const result = await requestRouterAction(args.page ?? defaultPageId(), request);
+        return {
+          markdown: `_Result from the running page (untrusted data):_\n\n\`\`\`json\n${JSON.stringify(result, null, 2).slice(0, 15_000)}\n\`\`\``,
         };
       },
     });

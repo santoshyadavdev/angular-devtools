@@ -13,6 +13,26 @@ import {
   type FormFieldNode,
   type FoundForm,
 } from './forms.ts';
+import {
+  findRouters,
+  setGeneration,
+  snapshotRouter,
+  watchRouter,
+  type NavigationRecord,
+  type RouterDebugApi,
+} from './router.ts';
+import { ConfigTracker, activeIds, walkConfig, type RouteNode } from './router-config.ts';
+import { detectSetup, preloaderOf, type RouterSetup } from './router-setup.ts';
+import { linksOf, outletsOf } from './router-links.ts';
+import {
+  captureCallers,
+  captureDiagnostics,
+  capturePreloads,
+  instrument,
+  isRouterAction,
+  runAction,
+  type PreloadRecord,
+} from './router-actions.ts';
 
 let highlightEl: HTMLElement | null = null;
 let highlightTimer: ReturnType<typeof setTimeout> | undefined;
@@ -218,11 +238,99 @@ export async function initOverlay(options: { baseURL?: string | string[] } = {})
     }
   }
 
+  const navigations: NavigationRecord[] = [];
+  const preloads: PreloadRecord[] = [];
+  const configTracker = new ConfigTracker();
+  let router: Record<string, unknown> | null = null;
+  let routerCount = 0;
+  let routerRoot: Element | null = null;
+  let routerCleanup: (() => void)[] = [];
+  let stopInstrument: (() => void) | null = null;
+  let instrumented = false;
+  let config: RouteNode[] | undefined;
+  let setup: RouterSetup | undefined;
+  let sentGeneration = -1;
+  let routerMisses = 0;
+  let lastRouterPayload = '';
+  let lastRouterPushAt = 0;
+  let routerPushTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function setInstrumented(on: boolean) {
+    stopInstrument?.();
+    stopInstrument = null;
+    instrumented = on;
+    if (on && router) stopInstrument = instrument(router, navigations);
+    lastRouterPayload = '';
+    scheduleRouterPush();
+  }
+
+  function attachRouter(ng: RouterDebugApi) {
+    const roots = Array.from(document.querySelectorAll('[ng-version]'));
+    const candidates = roots.length ? roots : findAngularElements().slice(0, 1);
+    const routers = findRouters(ng, candidates);
+    if (!routers.length) {
+      if (roots.some((root) => read(() => !!ng?.getComponent?.(root), false))) routerMisses++;
+      return;
+    }
+    router = routers[0];
+    routerCount = routers.length;
+    routerRoot = candidates[0] ?? null;
+    const stop = watchRouter(router, navigations, scheduleRouterPush);
+    if (stop) routerCleanup.push(stop);
+    routerCleanup.push(captureCallers(router, navigations));
+    routerCleanup.push(captureDiagnostics(router, navigations));
+    routerCleanup.push(capturePreloads(preloaderOf(ng, routerRoot), preloads, scheduleRouterPush));
+  }
+
+  async function pushRouter() {
+    try {
+      const ng = getNg() as RouterDebugApi | undefined;
+      if (!router && routerMisses < 3 && ng) attachRouter(ng);
+      const snapshot = router ? snapshotRouter(router) : null;
+      const report: Record<string, unknown> = { pageId, snapshot, navigations };
+      if (router && ng) {
+        if (configTracker.update(router) || !config) {
+          config = walkConfig(router);
+          setup = detectSetup(ng, router, routerCount, routerRoot);
+          setGeneration(configTracker.generation);
+          if (instrumented) {
+            stopInstrument?.();
+            stopInstrument = instrument(router, navigations);
+          }
+        }
+        report['generation'] = configTracker.generation;
+        if (sentGeneration !== configTracker.generation) report['config'] = config;
+        report['activeIds'] = activeIds(router);
+        report['setup'] = setup;
+        report['outlets'] = outletsOf(router);
+        report['links'] = linksOf(ng, router);
+        report['preloads'] = preloads;
+        report['instrumented'] = instrumented;
+      }
+      const payload = JSON.stringify(report);
+      if (payload === lastRouterPayload && Date.now() - lastRouterPushAt < FORMS_HEARTBEAT_MS) {
+        return;
+      }
+      lastRouterPayload = payload;
+      lastRouterPushAt = Date.now();
+      await my.rpc.call('push-router', report);
+      if (report['config']) sentGeneration = configTracker.generation;
+    } catch {
+      return;
+    }
+  }
+
+  function scheduleRouterPush() {
+    clearTimeout(routerPushTimer);
+    routerPushTimer = setTimeout(() => void pushRouter(), 50);
+  }
+
   pushTree();
   pushSignalGraph();
   pushInjectorTree();
   pushNgrxState();
   pushForms();
+  pushRouter();
 
   const interval = setInterval(() => {
     pushTree();
@@ -230,6 +338,7 @@ export async function initOverlay(options: { baseURL?: string | string[] } = {})
     pushInjectorTree();
     pushNgrxState();
     pushForms();
+    pushRouter();
   }, 3000);
 
   my.rpc.register({
@@ -246,6 +355,25 @@ export async function initOverlay(options: { baseURL?: string | string[] } = {})
         return;
       }
       if (el instanceof HTMLElement) showHighlight(el);
+    },
+  });
+
+  my.rpc.register({
+    name: 'router-action',
+    type: 'event',
+    jsonSerializable: true,
+    handler: (message: { requestId?: string; pageId?: string; request?: unknown }) => {
+      if (!message || typeof message.requestId !== 'string') return;
+      if (message.pageId && message.pageId !== pageId) return;
+      const respond = (result: unknown) =>
+        void my.rpc
+          .call('router-action-result', { requestId: message.requestId, pageId, result })
+          .catch(() => {});
+      if (!router) return respond({ error: 'This page has no Router.' });
+      if (!isRouterAction(message.request)) return respond({ error: 'Unknown action.' });
+      runAction(router, navigations, message.request, setInstrumented).then(respond, (error) =>
+        respond({ error: String((error as Error)?.message ?? error) }),
+      );
     },
   });
 
@@ -274,13 +402,20 @@ export async function initOverlay(options: { baseURL?: string | string[] } = {})
     },
   });
 
-  const leave = () => void my.rpc.call('forget-forms-page', pageId).catch(() => {});
+  const leave = () => {
+    void my.rpc.call('forget-forms-page', pageId).catch(() => {});
+    void my.rpc.call('forget-router-page', pageId).catch(() => {});
+  };
   addEventListener('pagehide', leave);
 
   return () => {
     clearInterval(interval);
     removeEventListener('pagehide', leave);
     for (const { stop } of watched.values()) stop();
+    for (const cleanup of routerCleanup) cleanup();
+    routerCleanup = [];
+    stopInstrument?.();
+    clearTimeout(routerPushTimer);
     releasePageId();
     watched.clear();
     clearHighlight();
@@ -459,6 +594,14 @@ function clearHighlight() {
 }
 
 // --- Signal Graph collection using Angular's debug API ---
+
+function read<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
 
 function getNg(): any {
   return (window as any).ng;

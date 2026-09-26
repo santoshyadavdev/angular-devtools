@@ -39,7 +39,7 @@ export const getRoutes = defineRpcFunction({
   }),
 });
 
-function extractRoutes(cwd: string): ExtractedRoute[] {
+export function extractRoutes(cwd: string): ExtractedRoute[] {
   const routes: ExtractedRoute[] = [];
   for (const root of sourceRoots(cwd)) findRouteFiles(root, cwd, routes);
   return routes;

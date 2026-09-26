@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard, brokenResolver, lockedGuard, userResolver } from './route-guards';
 
 /**
  * Deliberately varied: children, grandchildren, a redirect, route data and a
@@ -41,6 +42,30 @@ export const examplesRoutes: Routes = [
         path: 'details',
         loadComponent: () => import('./route-panel').then((m) => m.RoutePanel),
         data: { title: 'Details', depth: 3 },
+      },
+      {
+        path: 'users/:id',
+        loadComponent: () => import('./route-panel').then((m) => m.RoutePanel),
+        data: { title: 'User', depth: 3 },
+        resolve: { user: userResolver },
+      },
+      {
+        path: 'admin',
+        loadComponent: () => import('./route-panel').then((m) => m.RoutePanel),
+        canActivate: [adminGuard],
+        data: { title: 'Admin' },
+      },
+      {
+        path: 'locked',
+        loadComponent: () => import('./route-panel').then((m) => m.RoutePanel),
+        canActivate: [lockedGuard],
+        data: { title: 'Locked' },
+      },
+      {
+        path: 'broken',
+        loadComponent: () => import('./route-panel').then((m) => m.RoutePanel),
+        resolve: { report: brokenResolver },
+        data: { title: 'Broken' },
       },
     ],
   },

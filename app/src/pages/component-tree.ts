@@ -1,4 +1,4 @@
-import { Component, input, signal, effect } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import type { DevframeRpcClient } from 'devframe/client';
 
@@ -8,6 +8,14 @@ interface ComponentInfo {
   inputs: string[];
   outputs: string[];
   isStandalone: boolean;
+}
+
+interface OutletInfo {
+  outlet: string;
+  route?: string;
+  element?: string;
+  activated: boolean;
+  children?: OutletInfo[];
 }
 
 interface ProviderEntry {
@@ -48,6 +56,9 @@ interface ProviderEntry {
             >
               <div class="selector">&lt;{{ comp.selector }}&gt;</div>
               <div class="file">{{ comp.file }}</div>
+              @for (hit of routedBy().get(comp.selector) ?? []; track hit.outlet + hit.route) {
+                <span class="routed">routed {{ hit.route }} · outlet {{ hit.outlet }}</span>
+              }
             </button>
             @if (isSelected(comp)) {
               <div class="inline-detail">
@@ -258,9 +269,19 @@ interface ProviderEntry {
       background: #3f3f46;
       color: #a1a1aa;
     }
+    .routed {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 1px 6px;
+      border: 1px solid #52525b;
+      border-radius: 4px;
+      color: #d4d4d8;
+      font-size: 11px;
+      font-family: monospace;
+    }
     .provider-source {
       font-size: 12px;
-      color: #71717a;
+      color: #a1a1aa;
     }
     .no-providers {
       font-size: 13px;
@@ -279,6 +300,26 @@ export class ComponentTree {
   selectedProviders = signal<ProviderEntry[]>([]);
 
   filtered = signal<ComponentInfo[]>([]);
+  private readonly outlets = signal<OutletInfo[]>([]);
+  private unsubscribeRouter: (() => void) | null = null;
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly routedBy = computed(() => {
+    const map = new Map<string, { route: string; outlet: string }[]>();
+    const visit = (outlets: OutletInfo[]) => {
+      for (const outlet of outlets) {
+        if (outlet.activated && outlet.element && outlet.route) {
+          map.set(outlet.element, [
+            ...(map.get(outlet.element) ?? []),
+            { route: outlet.route, outlet: outlet.outlet },
+          ]);
+        }
+        if (outlet.children) visit(outlet.children);
+      }
+    };
+    visit(this.outlets());
+    return map;
+  });
 
   constructor() {
     effect(() => {
@@ -289,8 +330,30 @@ export class ComponentTree {
 
     effect(() => {
       const client = this.rpc();
-      if (client) this.refresh();
+      if (client) {
+        this.refresh();
+        void this.watchRouter(client);
+      }
     });
+    this.destroyRef.onDestroy(() => this.unsubscribeRouter?.());
+  }
+
+  private async watchRouter(client: DevframeRpcClient) {
+    try {
+      const state = await client.scope('ng-devtools').rpc.sharedState('router');
+      if (this.destroyRef.destroyed) return;
+      const apply = (value: unknown) => {
+        const pages =
+          (value as { pages?: { outlets?: OutletInfo[]; snapshot?: unknown }[] })?.pages ?? [];
+        const page = pages.find((p) => p.snapshot) ?? pages[0];
+        this.outlets.set(page?.outlets ?? []);
+      };
+      apply(state.value());
+      this.unsubscribeRouter?.();
+      this.unsubscribeRouter = state.on('updated', apply);
+    } catch {
+      this.outlets.set([]);
+    }
   }
 
   async refresh() {
