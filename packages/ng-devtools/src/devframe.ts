@@ -2,6 +2,7 @@ import type { RemoteAssets } from 'devframe';
 import { defineDevframe } from 'devframe';
 import { getRoutes } from './rpc/get-routes.ts';
 import { getComponents } from './rpc/get-components.ts';
+import { getPipes } from './rpc/get-pipes.ts';
 import { getBuildMeta } from './rpc/build-meta.ts';
 import { getSignals } from './rpc/get-signals.ts';
 import { getProviders } from './rpc/get-providers.ts';
@@ -44,6 +45,7 @@ const ngDevtools = defineDevframe({
 
     my.rpc.register(getRoutes);
     my.rpc.register(getComponents);
+    my.rpc.register(getPipes);
     my.rpc.register(getSignals);
     my.rpc.register(getProviders);
     my.rpc.register(getNgrxStore);

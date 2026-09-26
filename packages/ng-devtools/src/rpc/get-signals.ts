@@ -1,7 +1,7 @@
 import { defineRpcFunction } from 'devframe';
 import * as v from 'valibot';
 import { describable } from './agent-schema.ts';
-import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
   ANNOTATION,

@@ -10,7 +10,7 @@ import {
 } from './source-scan.ts';
 import * as v from 'valibot';
 import { describable } from './agent-schema.ts';
-import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ProviderEntrySchema = v.object({
