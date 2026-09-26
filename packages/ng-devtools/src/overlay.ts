@@ -1,4 +1,4 @@
-import { connectDevframe } from 'devframe/client';
+import { connectDevframe, type SetupDevframeConnectionOptions } from 'devframe/client';
 import {
   collectForms,
   diffForms,
@@ -83,10 +83,18 @@ function isFieldTarget(target: unknown): target is { formId: string; path: strin
   );
 }
 
-export async function initOverlay(options: { baseURL?: string | string[] } = {}) {
+export interface OverlayOptions {
+  baseURL?: string | string[];
+  connectionMeta?: SetupDevframeConnectionOptions['connectionMeta'];
+}
+
+export async function initOverlay(options: OverlayOptions = {}) {
   // `connectDevframe()` alone looks for the connection next to the page, which
   // misses the documented `/__ng-devtools/` mount in a host app.
-  const rpc = await connectDevframe({ baseURL: options.baseURL ?? ['./', '/__ng-devtools/'] });
+  const rpc = await connectDevframe({
+    baseURL: options.baseURL ?? ['./', '/__ng-devtools/'],
+    connectionMeta: options.connectionMeta,
+  });
   const my = rpc.scope('ng-devtools');
 
   async function pushTree() {
@@ -805,13 +813,4 @@ function safeSerialize(val: unknown): unknown {
   } catch {
     return String(val);
   }
-}
-
-// Auto-init when loaded as a script (skip during test environment)
-if (
-  typeof document !== 'undefined' &&
-  !(typeof process !== 'undefined' && process.env?.['VITEST'])
-) {
-  initOverlay().catch(console.error);
-  import('./popup.ts').then((m) => m.createDevtoolsPopup()).catch(console.error);
 }

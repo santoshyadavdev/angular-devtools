@@ -158,16 +158,52 @@ import '@santoshyadavdev/ng-devtools/overlay';
 It looks for the devframe connection next to the page and then at
 `/__ng-devtools/`.
 
-`initOverlay` is exported for a devtools mounted somewhere else. Importing the
-module has already started an overlay on the default URLs by then, so dispose of
-that one before starting another, or the page ends up with two connections and
-two polling intervals:
+For a devtools mounted somewhere else, import `initOverlay` from
+`/overlay/manual`, which starts nothing on import and adds no popup:
 
 ```ts
-import { initOverlay } from '@santoshyadavdev/ng-devtools/overlay';
+import { initOverlay } from '@santoshyadavdev/ng-devtools/overlay/manual';
 
 const dispose = await initOverlay({ baseURL: '/__my-devtools/' });
 ```
+
+### Capacitor and Ionic
+
+An Ionic or Capacitor app runs in a WebView, so the overlay works there as it
+does in a browser, forms included. The devtools server runs on your machine and
+the app connects to it:
+
+```ts
+// main.ts, after bootstrapApplication(...)
+if (isDevMode()) {
+  import('@santoshyadavdev/ng-devtools/overlay/manual').then(({ initOverlay }) =>
+    initOverlay({
+      baseURL: 'http://localhost:4000/__ng-devtools/',
+      connectionMeta: { backend: 'sse', sse: { path: '__sse' } },
+    }),
+  );
+}
+```
+
+`connectionMeta` describes the server, so the app does not have to fetch
+`__connection.json`, which the WebView blocks as a cross-origin request. Use
+`{ backend: 'sse', sse: { path: '__sse' } }` for the Express middleware with
+`ws: false`, and open `__connection.json` in a browser to see what another
+server uses.
+
+| Where the app runs         | How it reaches the server                                     |
+| -------------------------- | ------------------------------------------------------------- |
+| Android emulator or device | `adb reverse tcp:4000 tcp:4000` (USB), then `localhost` works |
+| iOS simulator              | `localhost` works as is                                       |
+
+Android blocks plain `http` unless you allow it for development in
+`capacitor.config.ts`:
+
+```ts
+server: { cleartext: true },
+```
+
+Open the devtools UI in your desktop browser at the server's `/__ng-devtools/`.
 
 ### In-Page Popup
 
