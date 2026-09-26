@@ -24,7 +24,7 @@
     "devtools:build-pkg": "pnpm --filter @santoshyadavdev/ng-devtools build",
     "devtools:publish": "pnpm --filter @santoshyadavdev/ng-devtools publish --access public",
     "extension:build": "pnpm devtools:build && rm -rf extension/ui && cp -r dist/devtools-ui extension/ui",
-    "extension:zip": "pnpm extension:build && cd extension && zip -r ../dist/ng-devtools-extension.zip . -x '*.DS_Store'"
+    "extension:zip": "pnpm extension:build && rm -f dist/ng-devtools-extension.zip && cd extension && zip -r ../dist/ng-devtools-extension.zip . -x '*.DS_Store'"
   },
   "private": true,
   "packageManager": "pnpm@10.33.4",

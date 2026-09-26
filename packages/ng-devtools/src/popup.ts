@@ -371,7 +371,13 @@ export function createDevtoolsPopup() {
     if (isOpen && !iframe.src) {
       const base = getBaseURL();
       const origin = location.origin;
-      iframe.src = `${origin}${base}?baseURL=${encodeURIComponent(origin + base)}`;
+      let pageId = '';
+      try {
+        pageId = sessionStorage.getItem('ng-devtools-page-id') ?? '';
+      } catch {
+        // Storage can be blocked; the panel then shows the latest page.
+      }
+      iframe.src = `${origin}${base}?baseURL=${encodeURIComponent(origin + base)}&pageId=${encodeURIComponent(pageId)}`;
     }
   }
 

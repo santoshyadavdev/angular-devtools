@@ -40,10 +40,23 @@ export interface SignalGraphEdge {
   producer: number;
 }
 
+export interface SignalChange {
+  epoch: number;
+  value: unknown;
+  /** Page clock, ms since epoch. */
+  at: number;
+  /** `write` is captured on set; `sample`/`initial` come from polling and may skip values. */
+  source: 'write' | 'sample' | 'initial';
+  /** Changes between this sample and the previous entry whose values weren't seen. */
+  missed?: number;
+}
+
 export interface SignalGraph {
   nodes: SignalGraphNode[];
   edges: SignalGraphEdge[];
   componentSelector?: string;
+  /** Recent value changes, keyed by node id, oldest first. */
+  history?: Record<string, SignalChange[]>;
 }
 
 export interface InjectorInfo {
