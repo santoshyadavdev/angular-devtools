@@ -182,6 +182,7 @@ describe('reactive serialization', () => {
         kind: 'minlength',
         params: { requiredLength: 3, actualLength: 2 },
         message: 'needs at least 3 characters (has 2)',
+        source: 'own',
       },
     ]);
 
@@ -893,7 +894,7 @@ describe('Angular spec edge cases', () => {
     const email = new FormControl('a@b.co');
     email.setErrors({ server: 'Email already taken' });
     expect(serializeControl(email).errors).toEqual([
-      { kind: 'server', message: 'Email already taken' },
+      { kind: 'server', message: 'Email already taken', source: 'manual' },
     ]);
   });
 

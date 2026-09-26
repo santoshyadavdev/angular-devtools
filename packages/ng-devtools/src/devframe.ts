@@ -19,6 +19,22 @@ import {
   type FormsState,
   type InspectFormsArgs,
 } from './rpc/forms-tools.ts';
+import {
+  explainCustomControlText,
+  explainFieldText,
+  explainSubmitText,
+  fieldOwner,
+  exportFormText,
+  formDiffText,
+  formHistoryText,
+  formPayloadText,
+  latestMarker,
+  lintFormsFor,
+  lintFormsText,
+  waitSatisfied,
+  type WaitUntil,
+} from './rpc/forms-explain.ts';
+import { findFormSource, sourceText } from './rpc/forms-source.ts';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -88,7 +104,7 @@ const ngDevtools = defineDevframe({
 
     const formPages = new Map<string, PageReport & { reportedAt: number }>();
     const formsState = await my.rpc.sharedState('forms', {
-      initialValue: { forms: [], events: [], reportedAt: 0 } as FormsState,
+      initialValue: { forms: [], events: [], reportedAt: 0, setupErrors: [] } as FormsState,
     });
 
     const applyForms = (next: FormsState) =>
@@ -96,6 +112,8 @@ const ngDevtools = defineDevframe({
         draft.forms = next.forms;
         draft.events = next.events;
         draft.reportedAt = next.reportedAt;
+        draft.setupErrors = next.setupErrors ?? [];
+        draft.instrumented = next.instrumented ?? [];
       });
 
     my.rpc.register({
@@ -135,6 +153,106 @@ const ngDevtools = defineDevframe({
           args: [target],
           optional: true,
         });
+      },
+    });
+
+    const pendingFormActions = new Map<string, (result: unknown) => void>();
+    let formActionSeq = 0;
+
+    const requestFormAction = (request: Record<string, unknown>, timeoutMs = 15_000) =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        const requestId = `f${++formActionSeq}`;
+        const formId = typeof request['formId'] === 'string' ? request['formId'] : undefined;
+        const explicit = typeof request['page'] === 'string' ? request['page'] : undefined;
+        const pageId = explicit ?? (formId?.includes('@') ? formId.split('@')[1] : undefined);
+        const { page: _page, ...payload } = request;
+        const timer = setTimeout(() => {
+          pendingFormActions.delete(requestId);
+          resolve({
+            ok: false,
+            error: `No page answered within ${Math.round(timeoutMs / 1000)}s. Is the app open in a browser, with that form on screen?`,
+          });
+        }, timeoutMs);
+        timer.unref?.();
+        pendingFormActions.set(requestId, (result) => {
+          clearTimeout(timer);
+          pendingFormActions.delete(requestId);
+          resolve(
+            (result && typeof result === 'object'
+              ? result
+              : { ok: false, error: 'Empty answer.' }) as Record<string, unknown>,
+          );
+        });
+        void my.rpc.broadcast({
+          method: 'form-action',
+          args: [{ requestId, pageId, request: payload }],
+          optional: true,
+        });
+      });
+
+    my.rpc.register({
+      name: 'form-action-result',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (message: { requestId?: unknown; result?: unknown }) => {
+        if (typeof message?.requestId !== 'string') return;
+        pendingFormActions.get(message.requestId)?.(message.result);
+      },
+    });
+
+    my.rpc.register({
+      name: 'request-form-action',
+      type: 'action',
+      jsonSerializable: true,
+      handler: (request: unknown) =>
+        request && typeof request === 'object'
+          ? requestFormAction(request as Record<string, unknown>)
+          : { ok: false, error: 'Bad request.' },
+    });
+
+    my.rpc.register({
+      name: 'forms-lint',
+      type: 'query',
+      jsonSerializable: true,
+      handler: (args: { form?: unknown; page?: unknown } | null) =>
+        lintFormsFor(formsState.value() as FormsState, {
+          form: typeof args?.form === 'string' ? args.form : undefined,
+          page: typeof args?.page === 'string' ? args.page : undefined,
+        }),
+    });
+
+    my.rpc.register({
+      name: 'forms-owners',
+      type: 'query',
+      jsonSerializable: true,
+      handler: () =>
+        (formsState.value() as FormsState).forms.map((form) => ({
+          formId: form.id,
+          label: form.label,
+          file: findFormSource(ctx.cwd, form.owner, form.property)?.form?.file ?? null,
+        })),
+    });
+
+    my.rpc.register({
+      name: 'forms-explain',
+      type: 'query',
+      jsonSerializable: true,
+      handler: (args: { kind?: unknown; form?: unknown; path?: unknown } | null) => {
+        const state = formsState.value() as FormsState;
+        const target = {
+          form: typeof args?.form === 'string' ? args.form : undefined,
+          path: typeof args?.path === 'string' ? args.path : undefined,
+        };
+        switch (args?.kind) {
+          case 'submit':
+            return explainSubmitText(state, target);
+          case 'payload':
+            return formPayloadText(state, target);
+          case 'fixture':
+            return exportFormText(state, { ...target, format: 'fixture' });
+          default:
+            return explainFieldText(state, target);
+        }
       },
     });
 
@@ -352,6 +470,10 @@ const ngDevtools = defineDevframe({
         type: 'object',
         properties: {
           form: formProperty,
+          page: {
+            type: 'string',
+            description: 'Page id (the part after @ in a form id) when several tabs are connected.',
+          },
           path: {
             type: 'string',
             description:
@@ -382,12 +504,343 @@ const ngDevtools = defineDevframe({
       safety: 'read',
       inputSchema: {
         type: 'object',
-        properties: { form: formProperty },
+        properties: {
+          form: formProperty,
+          page: {
+            type: 'string',
+            description: 'Page id (the part after @ in a form id) when several tabs are connected.',
+          },
+        },
       },
-      handler: async (args: { form?: string }) => {
+      handler: async (args: { form?: string; page?: string }) => {
         const state = formsState.value() as FormsState;
         if (!state.forms.length) return { markdown: noForms };
         return { markdown: explainFormsText(state, args) };
+      },
+    });
+
+    const pageProperty = {
+      type: 'string',
+      description: 'Page id (the part after @ in a form id) when several tabs are connected.',
+    };
+    const pathProperty = {
+      type: 'string',
+      description:
+        'Dotted field path, e.g. address.city or items.0.qty. Empty for the form itself.',
+    };
+    const withForms =
+      <A>(fn: (state: FormsState, args: A) => string) =>
+      async (args: A) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        return { markdown: fn(state, args ?? ({} as A)) };
+      };
+    const str = (value: unknown) => (typeof value === 'string' ? value : undefined);
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-field',
+      description:
+        'Explain one form field: value, flags, every error with where it comes from (validator, template attribute, cross-field rule and which ancestor, async, parse, server/submission, setErrors), why validation is skipped (hidden, disabled, readonly), inherited disabled reasons, uncommitted or debounced input, stale validity, rules and validator names, the binding (accessor or [formField]) and DOM facts (label, visible error text, drift). Pass `selector` instead of form/path to start from a CSS selector.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          path: pathProperty,
+          selector: { type: 'string', description: 'CSS selector of an input bound to a field.' },
+          page: pageProperty,
+        },
+      },
+      handler: async (args: { form?: string; path?: string; selector?: string; page?: string }) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        let target = { form: args?.form, path: args?.path, page: args?.page };
+        if (args?.selector) {
+          const located = await requestFormAction(
+            { action: 'locate', selector: args.selector, page: args.page },
+            5000,
+          );
+          if (!located['ok']) return { markdown: String(located['error'] ?? 'Not found.') };
+          target = {
+            form: str(located['formId']),
+            path: str(located['path']) ?? '',
+            page: undefined,
+          };
+        }
+        const owner = fieldOwner(state, target);
+        const source = owner
+          ? sourceText(findFormSource(ctx.cwd, owner.owner, owner.property, owner.path))
+          : '';
+        return { markdown: explainFieldText(state, target, Date.now(), source) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-submit',
+      description:
+        'Explain what submitting a form will do and why it might do nothing: Signal Forms submit() dry-run (action present, ignoreValidators, already submitting), ngSubmit semantics for reactive and template forms, DOM reasons (no submit button, type="button", disabled button, directive not on a <form>, native validation), blocking and pending fields, and recent submits with their outcome (ran, blocked, threw).',
+      safety: 'read',
+      inputSchema: { type: 'object', properties: { form: formProperty, page: pageProperty } },
+      handler: withForms(explainSubmitText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:form-payload',
+      description:
+        'Show what a form would send: form.value vs getRawValue() with the disabled fields form.value drops (reactive), or the hidden/disabled/readonly fields Signal Forms keeps in the value without validating them, plus which fields the user changed.',
+      safety: 'read',
+      inputSchema: { type: 'object', properties: { form: formProperty, page: pageProperty } },
+      handler: withForms(formPayloadText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:form-history',
+      description:
+        'Timeline of form changes: value (with previous value and repeat count), status, submit (ran, blocked, threw), added and removed fields, each tagged with its origin (user, code, devtools). Filter by form, path, type, origin or `since` (a marker from an earlier call). Returns the current marker.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          path: pathProperty,
+          type: {
+            type: 'string',
+            enum: [
+              'value',
+              'status',
+              'touched',
+              'dirty',
+              'submit',
+              'reset',
+              'added',
+              'removed',
+              'moved',
+              'validators',
+            ],
+          },
+          origin: { type: 'string', enum: ['user', 'code', 'devtools', 'binding'] },
+          since: { type: 'number', description: 'Only events after this marker.' },
+          limit: { type: 'number', description: 'Max events (default 50, max 200).' },
+          page: pageProperty,
+        },
+      },
+      handler: withForms(formHistoryText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:form-diff',
+      description:
+        'Net change of a form since a marker: each field whose value or status ended different, with from → to and how many changes happened in between. Get a marker from form-history, inspect-forms or a form-action result, act, then call this.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          since: {
+            type: 'number',
+            description: 'Marker to diff from (default: everything buffered).',
+          },
+          page: pageProperty,
+        },
+      },
+      handler: withForms(formDiffText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:lint-forms',
+      description:
+        'Deterministic checks on live forms: stale validity after validator changes, stuck PENDING, unreachable submit, missing submission action, hidden fields still rendered, view out of sync with the model, [disabled] on reactive controls, required-but-unbound fields, NG01xxx setup errors, and model-aware accessibility (missing label, aria-invalid desync, required not exposed, error text not shown or not linked, no focus after invalid submit).',
+      safety: 'read',
+      inputSchema: { type: 'object', properties: { form: formProperty, page: pageProperty } },
+      handler: async (args: { form?: string; page?: string }) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length && !state.setupErrors?.length) return { markdown: noForms };
+        return { markdown: lintFormsText(state, args ?? {}) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:explain-custom-control',
+      description:
+        'Explain how a field is bound to its element (built-in accessor, custom ControlValueAccessor, custom control, [formField]) and what is wrong with it: value drift, missing setDisabledState, touched never set, captured NG01xxx setup errors.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: { form: formProperty, path: pathProperty, page: pageProperty },
+      },
+      handler: withForms(explainCustomControlText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:export-form',
+      description:
+        'Export a form as a JSON snapshot (tree, status, raw value) or as a test fixture (setValue / signal model plus the expected status) with a repro header. Secret values stay [redacted].',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          format: { type: 'string', enum: ['snapshot', 'fixture'] },
+          page: pageProperty,
+        },
+      },
+      handler: withForms(exportFormText),
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:wait-for-form',
+      description:
+        'Wait until a form is settled (no pending async validation, debounce or submit in flight), valid, not pending, or submitted after a marker. Resolves as soon as the condition holds, or reports the state on timeout.',
+      safety: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          form: formProperty,
+          until: { type: 'string', enum: ['settled', 'valid', 'not-pending', 'submitted'] },
+          since: { type: 'number', description: 'Marker for `submitted`.' },
+          timeoutMs: { type: 'number', description: 'Default 5000, max 30000.' },
+          page: pageProperty,
+        },
+      },
+      handler: async (args: {
+        form?: string;
+        until?: WaitUntil;
+        since?: number;
+        timeoutMs?: number;
+        page?: string;
+      }) => {
+        const timeout = Math.min(Math.max(Number(args?.timeoutMs) || 5000, 100), 30_000);
+        const start = Date.now();
+        while (true) {
+          const state = formsState.value() as FormsState;
+          if (waitSatisfied(state, args ?? {})) {
+            return {
+              markdown: `Condition \`${args?.until ?? 'settled'}\` holds after ${Date.now() - start}ms. Marker: ${latestMarker(state)}.\n\n${explainFormsText(state, { form: args?.form, page: args?.page })}`,
+            };
+          }
+          if (Date.now() - start >= timeout) {
+            return {
+              markdown: `Timed out after ${timeout}ms waiting for \`${args?.until ?? 'settled'}\`.\n\n${explainFormsText(state, { form: args?.form, page: args?.page })}`,
+            };
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      },
+    });
+
+    const actionText = (result: Record<string, unknown>, state: FormsState) => {
+      const lines = [
+        result['ok']
+          ? `Done: ${String(result['message'] ?? '')}`
+          : `Refused: ${String(result['error'] ?? result['message'] ?? 'failed')}`,
+      ];
+      const skipped = Array.isArray(result['skipped'])
+        ? (result['skipped'] as { path: string; reason: string }[])
+        : [];
+      if (skipped.length)
+        lines.push(`Skipped: ${skipped.map((s) => `\`${s.path}\` ${s.reason}`).join('; ')}.`);
+      if (typeof result['status'] === 'string') lines.push(`Form status now: ${result['status']}.`);
+      const invalid = Array.isArray(result['invalid']) ? (result['invalid'] as string[]) : [];
+      if (invalid.length)
+        lines.push(`Fields with errors: ${invalid.map((p) => `\`${p || '(form)'}\``).join(', ')}.`);
+      if (typeof result['expression'] === 'string') lines.push(`Console: ${result['expression']}`);
+      if (typeof result['snapshot'] === 'string')
+        lines.push(`Snapshot id: ${result['snapshot']} (use with restore).`);
+      lines.push(
+        `Marker: ${latestMarker(state)}. Call form-diff with since set to the marker you had before this action to see what changed.`,
+      );
+      return lines.join('\n');
+    };
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:form-action',
+      description:
+        'Act on a live form (dev mode). Actions: set-value (mode code or user; user goes through the input like typing), mark-touched, mark-untouched, mark-dirty, mark-pristine, touch-all, revalidate (Signal Forms: reloads async/HTTP validation), reset, enable, disable (reactive only), submit, focus, focus-first-invalid, store-as-global ($form in the page console), snapshot, restore, instrument (value true or false: record the calling code of form changes, validator changes and template updates per keystroke, shown by form-history). reset, submit and restore need confirm: true. Secret, hidden and readonly fields are never written; disabled reactive fields need force.',
+      safety: 'action',
+      inputSchema: {
+        type: 'object',
+        required: ['action', 'form'],
+        properties: {
+          action: {
+            type: 'string',
+            enum: [
+              'set-value',
+              'mark-touched',
+              'mark-untouched',
+              'mark-dirty',
+              'mark-pristine',
+              'touch-all',
+              'revalidate',
+              'reset',
+              'enable',
+              'disable',
+              'submit',
+              'focus',
+              'focus-first-invalid',
+              'store-as-global',
+              'snapshot',
+              'restore',
+              'instrument',
+            ],
+          },
+          form: { type: 'string', description: 'Full form id, e.g. form-1@ab12.' },
+          path: pathProperty,
+          value: { description: 'New value for set-value.' },
+          mode: { type: 'string', enum: ['code', 'user'] },
+          confirm: { type: 'boolean' },
+          force: { type: 'boolean' },
+          snapshot: { type: 'string', description: 'Snapshot id for restore.' },
+        },
+      },
+      handler: async (args: Record<string, unknown>) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        const form = str(args?.['form']);
+        const match = state.forms.find((f) => f.id === form || f.id.split('@')[0] === form);
+        if (!match)
+          return {
+            markdown: `No form ${form ?? ''}. Forms: ${state.forms.map((f) => f.id).join(', ')}.`,
+          };
+        const { form: _form, ...rest } = args;
+        const result = await requestFormAction({ ...rest, formId: match.id });
+        return { markdown: actionText(result, formsState.value() as FormsState) };
+      },
+    });
+
+    ctx.agent.registerTool({
+      id: 'ng-devtools:fill-form',
+      description:
+        'Fill several fields at once, by dotted path, through the inputs like a user would (so parsing, dirty and touched run for real). Reports written and skipped fields (secret, hidden, readonly, disabled, missing) and the resulting status. Optionally submits afterwards (needs confirm: true).',
+      safety: 'action',
+      inputSchema: {
+        type: 'object',
+        required: ['form', 'values'],
+        properties: {
+          form: { type: 'string', description: 'Full form id, e.g. form-1@ab12.' },
+          values: { type: 'object', description: 'Map of field path to value.' },
+          mode: { type: 'string', enum: ['code', 'user'] },
+          submit: { type: 'boolean' },
+          confirm: { type: 'boolean' },
+        },
+      },
+      handler: async (args: Record<string, unknown>) => {
+        const state = formsState.value() as FormsState;
+        if (!state.forms.length) return { markdown: noForms };
+        const form = str(args?.['form']);
+        const match = state.forms.find((f) => f.id === form || f.id.split('@')[0] === form);
+        if (!match)
+          return {
+            markdown: `No form ${form ?? ''}. Forms: ${state.forms.map((f) => f.id).join(', ')}.`,
+          };
+        const result = await requestFormAction({
+          action: 'fill',
+          formId: match.id,
+          values: args['values'],
+          mode: args['mode'],
+          submit: args['submit'],
+          confirm: args['confirm'],
+        });
+        return { markdown: actionText(result, formsState.value() as FormsState) };
       },
     });
   },

@@ -1,74 +1,73 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import type { DevframeRpcClient } from 'devframe/client';
+import { FormsFieldDetail } from './forms-field-detail';
+import { FormsLint, FormsSubmit } from './forms-report';
+import { FormsTimeline } from './forms-timeline';
+import {
+  FORMS_STYLES,
+  KIND_LABELS,
+  SOURCE_LABELS,
+  actionMessage,
+  formAction,
+  type CollectedForm,
+  type FormEvent,
+  type FormFieldError,
+  type FormFieldNode,
+} from './forms-types';
 
-type FieldStatus = 'VALID' | 'INVALID' | 'PENDING' | 'DISABLED';
+type Tab = 'fields' | 'timeline' | 'submit' | 'lint';
+type Chip = 'invalid' | 'dirty' | 'touched' | 'disabled' | 'hidden-error';
 
-interface FormFieldError {
-  kind: string;
-  message: string;
-}
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'fields', label: 'Fields' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'submit', label: 'Submit' },
+  { id: 'lint', label: 'Lint' },
+];
 
-interface FormFieldNode {
-  key: string;
-  path: string;
-  type: 'group' | 'array' | 'control';
-  status: FieldStatus;
-  touched: boolean;
-  dirty: boolean;
-  required?: boolean;
-  readonly?: boolean;
-  hidden?: boolean;
-  disabledReasons?: string[];
-  updateOn?: 'blur' | 'submit';
-  materialized?: false;
-  bound: boolean;
-  constraints?: Record<string, number | string>;
-  submitting?: boolean;
-  debouncing?: boolean;
-  validators?: { sync: boolean; async: boolean };
-  defaultValue?: unknown;
-  accessor?: string;
-  value?: unknown;
-  errors: FormFieldError[];
-  children?: FormFieldNode[];
-  truncated?: number;
-}
+const CHIPS: { id: Chip; label: string }[] = [
+  { id: 'invalid', label: 'Invalid' },
+  { id: 'dirty', label: 'Dirty' },
+  { id: 'touched', label: 'Touched' },
+  { id: 'disabled', label: 'Disabled' },
+  { id: 'hidden-error', label: 'Error not shown' },
+];
 
-interface CollectedForm {
-  id: string;
-  kind: 'signal' | 'reactive' | 'template';
-  owner: string;
-  property?: string;
-  label: string;
-  submitted?: boolean;
-  root: FormFieldNode;
-}
-
-interface FormEvent {
-  formId: string;
-  path: string;
-  type: string;
-  detail?: string;
-  timestamp: number;
-  seq?: number;
+function matchesChip(node: FormFieldNode, chip: Chip): boolean {
+  switch (chip) {
+    case 'invalid':
+      return node.errors.length > 0;
+    case 'dirty':
+      return node.dirty && node.type === 'control';
+    case 'touched':
+      return node.touched && node.type === 'control';
+    case 'disabled':
+      return node.status === 'DISABLED';
+    case 'hidden-error':
+      return node.dom?.errorShown === false;
+  }
 }
 
 interface FormsSnapshot {
   forms?: CollectedForm[];
   events?: FormEvent[];
+  instrumented?: string[];
 }
 
 interface FieldRow {
   node: FormFieldNode;
   depth: number;
 }
-
-const KIND_LABELS: Record<CollectedForm['kind'], string> = {
-  signal: 'Signal Forms',
-  reactive: 'Reactive',
-  template: 'Template-driven',
-};
 
 function countErrors(node: FormFieldNode): number {
   return node.errors.length + (node.children ?? []).reduce((sum, c) => sum + countErrors(c), 0);
@@ -80,7 +79,7 @@ function countFields(node: FormFieldNode): number {
 
 @Component({
   selector: 'app-forms-inspector',
-  imports: [JsonPipe],
+  imports: [JsonPipe, FormsFieldDetail, FormsTimeline, FormsSubmit, FormsLint],
   template: `
     @if (!rpc()) {
       <p class="empty">Connecting…</p>
@@ -142,153 +141,312 @@ function countFields(node: FormFieldNode): number {
               >
             </div>
 
-            <input
-              class="filter"
-              type="search"
-              placeholder="Filter fields by path"
-              aria-label="Filter fields by path"
-              [value]="filter()"
-              (input)="onFilter($event)"
-            />
-
-            <div class="table-scroll" role="region" aria-label="Fields" tabindex="0">
-              <table class="fields">
-                <thead>
-                  <tr>
-                    <th scope="col">Field</th>
-                    <th scope="col">Value</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">State</th>
-                    <th scope="col">Errors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of rows(); track row.node.path) {
-                    <tr
-                      [class.invalid]="row.node.errors.length"
-                      (mouseenter)="highlight(form.id, row.node.path)"
-                      (mouseleave)="highlight(null, '')"
-                    >
-                      <th scope="row" [style.padding-left.px]="8 + row.depth * 16">
-                        <button
-                          type="button"
-                          class="field"
-                          [attr.aria-label]="
-                            'Highlight ' + (row.node.path || 'the form') + ' on the page'
-                          "
-                          (focus)="highlight(form.id, row.node.path)"
-                          (blur)="highlight(null, '')"
-                        >
-                          {{ row.node.key || '(form)' }}
-                        </button>
-                        <span class="type">{{ row.node.type }}</span>
-                      </th>
-                      <td class="value">
-                        @if (row.node.type === 'control') {
-                          <code>{{ row.node.value | json }}</code>
-                          @if (row.node.defaultValue !== undefined) {
-                            <div class="muted">
-                              resets to <code>{{ row.node.defaultValue | json }}</code>
-                            </div>
-                          }
-                        }
-                      </td>
-                      <td>
-                        @if (row.node.materialized === false) {
-                          <span class="muted">not created yet</span>
-                        } @else {
-                          <span class="badge" [attr.data-status]="row.node.status">{{
-                            row.node.status
-                          }}</span>
-                        }
-                      </td>
-                      <td class="flags">
-                        @if (row.node.touched) {
-                          <span>touched</span>
-                        }
-                        @if (row.node.dirty) {
-                          <span>dirty</span>
-                        }
-                        @if (row.node.required) {
-                          <span>required</span>
-                        }
-                        @if (row.node.readonly) {
-                          <span>readonly</span>
-                        }
-                        @if (row.node.hidden) {
-                          <span>hidden</span>
-                        }
-                        @if (row.node.updateOn) {
-                          <span>updates on {{ row.node.updateOn }}</span>
-                        }
-                        @if (row.node.debouncing) {
-                          <span>debouncing</span>
-                        }
-                        @if (row.node.validators?.sync) {
-                          <span>validators</span>
-                        }
-                        @if (row.node.validators?.async) {
-                          <span>async validator</span>
-                        }
-                        @for (rule of constraintList(row.node); track rule) {
-                          <span>{{ rule }}</span>
-                        }
-                        @if (row.node.accessor) {
-                          <span>{{ row.node.accessor }}</span>
-                        }
-                        @for (reason of row.node.disabledReasons ?? []; track $index) {
-                          <span>disabled: {{ reason }}</span>
-                        }
-                      </td>
-                      <td class="errors">
-                        @for (error of row.node.errors; track $index) {
-                          <div>
-                            {{ errorText(row.node, error) }}
-                            <code class="kind-tag">{{ error.kind }}</code>
-                          </div>
-                        }
-                      </td>
-                    </tr>
-                    @if (row.node.truncated) {
-                      <tr>
-                        <td colspan="5" class="muted" [style.padding-left.px]="24 + row.depth * 16">
-                          {{ row.node.truncated }} more fields under
-                          {{ row.node.path || 'the form' }} not shown
-                        </td>
-                      </tr>
-                    }
-                  } @empty {
-                    <tr>
-                      <td colspan="5" class="muted">No field path matches "{{ filter() }}".</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+            <div class="actions" role="group" aria-label="Form actions">
+              <button type="button" class="small" (click)="act('touch-all')">Touch all</button>
+              <button type="button" class="small" (click)="act('revalidate')">Revalidate</button>
+              <button type="button" class="small" (click)="act('focus-first-invalid')">
+                Focus first invalid
+              </button>
+              <button type="button" class="small" (click)="pick()">Pick field on page</button>
+              <button type="button" class="small" (click)="act('snapshot')">Snapshot</button>
+              @if (snapshot()) {
+                <button type="button" class="small" (click)="confirmAct('restore')">
+                  {{ armed() === 'restore' ? 'Confirm restore' : 'Restore ' + snapshot() }}
+                </button>
+              }
+              <button type="button" class="small" (click)="confirmAct('reset')">
+                {{ armed() === 'reset' ? 'Confirm reset' : 'Reset' }}
+              </button>
+              <button type="button" class="small" (click)="confirmAct('submit')">
+                {{ armed() === 'submit' ? 'Confirm submit' : 'Submit' }}
+              </button>
             </div>
+            <p class="status" role="status">{{ message() }}</p>
 
-            <h2>Recent changes</h2>
-            @if (selectedEvents().length) {
-              <ol class="events">
-                @for (event of selectedEvents(); track event.formId + '#' + event.seq) {
-                  <li>
-                    <time>{{ time(event.timestamp) }}</time>
-                    <code>{{ event.path || '(form)' }}</code>
-                    <span class="event-type">{{ event.type }}</span>
-                    @if (event.detail) {
-                      <span class="muted">{{ event.detail }}</span>
+            <div class="tabs" role="tablist" aria-label="Form views" (keydown)="onKey($event)">
+              @for (tab of tabs; track tab.id) {
+                <button
+                  type="button"
+                  role="tab"
+                  [id]="'forms-tab-' + tab.id"
+                  [attr.aria-selected]="tab.id === tab_()"
+                  [attr.aria-controls]="'forms-panel-' + tab.id"
+                  [attr.tabindex]="tab.id === tab_() ? 0 : -1"
+                  (click)="tab_.set(tab.id)"
+                >
+                  {{ tab.label }}
+                </button>
+              }
+            </div>
+            <div
+              class="panel"
+              role="tabpanel"
+              [id]="'forms-panel-' + tab_()"
+              [attr.aria-labelledby]="'forms-tab-' + tab_()"
+            >
+              @switch (tab_()) {
+                @case ('fields') {
+                  <fieldset class="chips">
+                    <legend class="sr-only">Show only fields that are</legend>
+                    @for (chip of chips; track chip.id) {
+                      <label>
+                        <input
+                          type="checkbox"
+                          [checked]="active().has(chip.id)"
+                          (change)="toggleChip(chip.id)"
+                        />
+                        {{ chip.label }}
+                      </label>
                     }
-                  </li>
+                  </fieldset>
+                  <input
+                    class="filter"
+                    type="search"
+                    placeholder="Filter fields by path"
+                    aria-label="Filter fields by path"
+                    [value]="filter()"
+                    (input)="onFilter($event)"
+                  />
+
+                  <div class="table-scroll" role="region" aria-label="Fields" tabindex="0">
+                    <table class="fields">
+                      <thead>
+                        <tr>
+                          <th scope="col">Field</th>
+                          <th scope="col">Value</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">State</th>
+                          <th scope="col">Errors</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of rows(); track row.node.path) {
+                          <tr
+                            [class.invalid]="row.node.errors.length"
+                            (mouseenter)="highlight(form.id, row.node.path)"
+                            (mouseleave)="highlight(null, '')"
+                          >
+                            <th scope="row" [style.padding-left.px]="8 + row.depth * 16">
+                              <button
+                                type="button"
+                                class="field"
+                                [attr.aria-label]="
+                                  'Highlight ' + (row.node.path || 'the form') + ' on the page'
+                                "
+                                [attr.aria-pressed]="row.node.path === fieldPath()"
+                                (focus)="highlight(form.id, row.node.path)"
+                                (blur)="highlight(null, '')"
+                                (click)="fieldPath.set(row.node.path)"
+                              >
+                                {{ row.node.key || '(form)' }}
+                              </button>
+                              <span class="type">{{ row.node.type }}</span>
+                            </th>
+                            <td class="value">
+                              @if (row.node.type === 'control') {
+                                <code>{{ row.node.value | json }}</code>
+                                @if (row.node.uncommitted !== undefined) {
+                                  <div class="muted">
+                                    typed <code>{{ row.node.uncommitted | json }}</code
+                                    >, not in the model yet
+                                  </div>
+                                }
+                                @if (row.node.defaultValue !== undefined) {
+                                  <div class="muted">
+                                    resets to <code>{{ row.node.defaultValue | json }}</code>
+                                  </div>
+                                }
+                              }
+                            </td>
+                            <td>
+                              @if (row.node.materialized === false) {
+                                <span class="muted">not created yet</span>
+                              } @else {
+                                <span class="badge" [attr.data-status]="row.node.status">{{
+                                  row.node.status
+                                }}</span>
+                              }
+                            </td>
+                            <td class="flags">
+                              @if (row.node.touched) {
+                                <span>touched</span>
+                              }
+                              @if (row.node.dirty) {
+                                <span>{{
+                                  row.node.changed === false ? 'dirty, unchanged' : 'dirty'
+                                }}</span>
+                              }
+                              @if (row.node.skipped) {
+                                <span>not validated ({{ row.node.skipped }})</span>
+                              }
+                              @if (row.node.stale?.length) {
+                                <span class="warn">stale: {{ row.node.stale!.join(', ') }}</span>
+                              }
+                              @if (row.node.dom?.drift !== undefined) {
+                                <span class="warn">view out of sync</span>
+                              }
+                              @if (row.node.redacted) {
+                                <span>redacted ({{ row.node.redacted }})</span>
+                              }
+                              @if (row.node.required) {
+                                <span>required</span>
+                              }
+                              @if (row.node.readonly) {
+                                <span>readonly</span>
+                              }
+                              @if (row.node.hidden) {
+                                <span>hidden</span>
+                              }
+                              @if (row.node.updateOn) {
+                                <span>updates on {{ row.node.updateOn }}</span>
+                              }
+                              @if (row.node.debouncing) {
+                                <span>debouncing</span>
+                              }
+                              @if (row.node.validators?.sync) {
+                                <span>validators</span>
+                              }
+                              @if (row.node.validators?.async) {
+                                <span>async validator</span>
+                              }
+                              @for (rule of constraintList(row.node); track rule) {
+                                <span>{{ rule }}</span>
+                              }
+                              @if (row.node.accessor) {
+                                <span>{{ row.node.accessor }}</span>
+                              }
+                              @for (reason of row.node.disabledReasons ?? []; track $index) {
+                                <span>disabled: {{ reason }}</span>
+                              }
+                            </td>
+                            <td class="errors">
+                              @for (error of row.node.errors; track $index) {
+                                <div>
+                                  {{ errorText(row.node, error) }}
+                                  <code class="kind-tag">{{ error.kind }}</code>
+                                  @if (error.source) {
+                                    <span class="source">{{ sourceText(error) }}</span>
+                                  }
+                                </div>
+                              }
+                              @if (row.node.errors.length && row.node.dom?.errorShown === false) {
+                                <div class="unseen">not shown to the user</div>
+                              }
+                            </td>
+                          </tr>
+                          @if (row.node.truncated) {
+                            <tr>
+                              <td
+                                colspan="5"
+                                class="muted"
+                                [style.padding-left.px]="24 + row.depth * 16"
+                              >
+                                {{ row.node.truncated }} more fields under
+                                {{ row.node.path || 'the form' }} not shown
+                              </td>
+                            </tr>
+                          }
+                        } @empty {
+                          <tr>
+                            <td colspan="5" class="muted">
+                              No field path matches "{{ filter() }}".
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+
+                  @if (selectedNode(); as node) {
+                    <app-forms-field-detail
+                      [form]="form"
+                      [node]="node"
+                      [version]="version()"
+                      [rpc]="rpc()"
+                    />
+                  }
                 }
-              </ol>
-            } @else {
-              <p class="muted">No changes yet. Type into the form to see them here.</p>
-            }
+                @case ('timeline') {
+                  <app-forms-timeline
+                    [events]="selectedEvents()"
+                    [recording]="recording()"
+                    (record)="setRecording($event)"
+                  />
+                }
+                @case ('submit') {
+                  <app-forms-submit [formId]="form.id" [version]="version()" [rpc]="rpc()" />
+                }
+                @case ('lint') {
+                  <app-forms-lint [formId]="form.id" [version]="version()" [rpc]="rpc()" />
+                }
+              }
+            </div>
           </section>
         }
       </div>
     }
   `,
   styles: `
+    ${FORMS_STYLES}
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #27272a;
+    }
+    .tabs [role='tab'] {
+      padding: 6px 12px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      color: #d4d4d8;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tabs [role='tab'][aria-selected='true'] {
+      border-bottom-color: var(--accent);
+      color: #fafafa;
+    }
+    .tabs [role='tab']:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .panel {
+      display: grid;
+      gap: 12px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      color: #d4d4d8;
+      font-size: 13px;
+    }
+    .field[aria-pressed='true'] {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    .flags span.warn {
+      border-color: #a16207;
+      color: #fef08a;
+    }
+    .source {
+      margin-left: 6px;
+      color: #a1a1aa;
+      font-size: 11px;
+    }
+    .unseen {
+      color: #fde68a !important;
+      font-size: 11px;
+    }
     .layout {
       display: grid;
       grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
@@ -463,8 +621,7 @@ function countFields(node: FormFieldNode): number {
       font-weight: 400;
     }
     .value code,
-    .errors code,
-    .events code {
+    .errors code {
       color: #c4b5fd;
       overflow-wrap: anywhere;
     }
@@ -485,32 +642,6 @@ function countFields(node: FormFieldNode): number {
       color: #a1a1aa;
       font-size: 11px;
     }
-    h2 {
-      margin: 8px 0 0;
-      color: #d4d4d8;
-      font-size: 14px;
-    }
-    .events {
-      display: grid;
-      gap: 4px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      font-size: 13px;
-    }
-    .events li {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      color: #d4d4d8;
-    }
-    .events time {
-      color: #a1a1aa;
-      font-variant-numeric: tabular-nums;
-    }
-    .event-type {
-      color: #93c5fd;
-    }
     .muted {
       color: #a1a1aa;
     }
@@ -523,13 +654,28 @@ function countFields(node: FormFieldNode): number {
 })
 export class FormsInspector {
   rpc = input<DevframeRpcClient | null>(null);
+  focus = input<string | null>(null);
 
   readonly forms = signal<CollectedForm[]>([]);
   readonly events = signal<FormEvent[]>([]);
   readonly loading = signal(true);
   readonly failed = signal(false);
   readonly selectedId = signal<string | null>(null);
+  readonly instrumented = signal<string[]>([]);
+  readonly recording = computed(() => {
+    const id = this.selected()?.id ?? '';
+    return this.instrumented().some((page) => id.endsWith(`@${page}`));
+  });
   readonly filter = signal('');
+  readonly tabs = TABS;
+  readonly chips = CHIPS;
+  readonly tab_ = signal<Tab>('fields');
+  readonly active = signal(new Set<Chip>());
+  readonly fieldPath = signal<string | null>(null);
+  readonly version = signal(0);
+  readonly message = signal('');
+  readonly armed = signal<string | null>(null);
+  readonly snapshot = signal<string | null>(null);
 
   private unsubscribe: (() => void) | null = null;
   private readonly destroyRef = inject(DestroyRef);
@@ -553,10 +699,13 @@ export class FormsInspector {
     const form = this.selected();
     if (!form) return [];
     const query = this.filter().toLowerCase();
+    const chips = Array.from(this.active());
     const rows: FieldRow[] = [];
     const visit = (node: FormFieldNode, depth: number): boolean => {
       const at = rows.length;
-      let keep = !query || node.path.toLowerCase().includes(query);
+      let keep =
+        (!query || node.path.toLowerCase().includes(query)) &&
+        chips.every((chip) => matchesChip(node, chip));
       for (const child of node.children ?? []) keep = visit(child, depth + 1) || keep;
       if (keep) rows.splice(at, 0, { node, depth });
       return keep;
@@ -565,18 +714,30 @@ export class FormsInspector {
     return rows;
   });
 
+  readonly selectedNode = computed(() => {
+    const path = this.fieldPath();
+    const form = this.selected();
+    if (path === null || !form) return null;
+    const find = (node: FormFieldNode): FormFieldNode | null =>
+      node.path === path ? node : ((node.children ?? []).map(find).find(Boolean) ?? null);
+    return find(form.root);
+  });
+
   readonly selectedEvents = computed(() => {
     const id = this.selected()?.id;
     return this.events()
       .filter((e) => e.formId === id)
-      .slice(-50)
-      .reverse();
+      .slice(-200);
   });
 
   constructor() {
     effect(() => {
       const client = this.rpc();
       if (client) this.load(client);
+    });
+    effect(() => {
+      const focus = this.focus();
+      if (focus) untracked(() => this.selectForm(focus));
     });
     this.destroyRef.onDestroy(() => {
       this.unsubscribe?.();
@@ -594,6 +755,8 @@ export class FormsInspector {
         const snapshot = value as FormsSnapshot | undefined;
         this.forms.set(snapshot?.forms ?? []);
         this.events.set(snapshot?.events ?? []);
+        this.instrumented.set(snapshot?.instrumented ?? []);
+        this.version.update((v) => v + 1);
       };
       apply(state.value());
       this.unsubscribe?.();
@@ -605,9 +768,86 @@ export class FormsInspector {
     }
   }
 
+  async pick() {
+    const form = this.selected();
+    if (!form) return;
+    this.message.set('Click a field in the app (Esc cancels).');
+    const result = await formAction(this.rpc(), { action: 'pick', formId: form.id });
+    const picked = result as typeof result & { formId?: string; path?: string };
+    if (!result.ok || !picked.formId) {
+      this.message.set(actionMessage(result));
+      return;
+    }
+    this.selectForm(picked.formId);
+    this.tab_.set('fields');
+    this.fieldPath.set(picked.path ?? '');
+    this.message.set(`Picked ${picked.path || '(form)'}.`);
+  }
+
+  async setRecording(on: boolean) {
+    const form = this.selected();
+    if (!form) return;
+    const result = await formAction(this.rpc(), {
+      action: 'instrument',
+      formId: form.id,
+      value: on,
+    });
+    this.message.set(actionMessage(result));
+  }
+
   selectForm(id: string) {
     this.selectedId.set(id);
     this.filter.set('');
+    this.fieldPath.set(null);
+    this.snapshot.set(null);
+    this.armed.set(null);
+  }
+
+  toggleChip(chip: Chip) {
+    this.active.update((set) => {
+      const next = new Set(set);
+      if (next.has(chip)) next.delete(chip);
+      else next.add(chip);
+      return next;
+    });
+  }
+
+  async act(action: string, extra: Record<string, unknown> = {}) {
+    const form = this.selected();
+    if (!form) return;
+    this.armed.set(null);
+    const result = await formAction(this.rpc(), { action, formId: form.id, ...extra });
+    if (result.snapshot) this.snapshot.set(result.snapshot);
+    this.message.set(actionMessage(result));
+  }
+
+  confirmAct(action: 'reset' | 'submit' | 'restore') {
+    if (this.armed() !== action) {
+      this.armed.set(action);
+      this.message.set(`Press "Confirm ${action}" to ${action} the form in the app.`);
+      return;
+    }
+    void this.act(action, { confirm: true, snapshot: this.snapshot() ?? undefined });
+  }
+
+  onKey(event: KeyboardEvent) {
+    const order = this.tabs.map((tab) => tab.id);
+    const index = order.indexOf(this.tab_());
+    let next = index;
+    if (event.key === 'ArrowRight') next = (index + 1) % order.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + order.length) % order.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = order.length - 1;
+    else return;
+    event.preventDefault();
+    this.tab_.set(order[next]);
+    const host = event.currentTarget as HTMLElement;
+    queueMicrotask(() => host.querySelector<HTMLElement>(`#forms-tab-${order[next]}`)?.focus());
+  }
+
+  sourceText(error: FormFieldError) {
+    const label = SOURCE_LABELS[error.source ?? ''] ?? error.source ?? '';
+    return error.from !== undefined ? `${label} on ${error.from || 'the form'}` : label;
   }
 
   onFilter(event: Event) {
@@ -634,9 +874,5 @@ export class FormsInspector {
     return /^[a-z]/.test(error.message)
       ? `${node.key || 'The form'} ${error.message}`
       : error.message;
-  }
-
-  time(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString();
   }
 }

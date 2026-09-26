@@ -56,8 +56,8 @@ describe('explainForm', () => {
     expect(text).toBe(
       [
         '**Signup.form** (reactive, id form-1) is INVALID.',
-        '- `email` = "x" [email] is not a valid email address (touched: no)',
-        '- `nested.age` = 3 [min] must be at least 13 (is 3) (touched: no)',
+        '- `email` = "x" [email] is not a valid email address (validator; touched: no)',
+        '- `nested.age` = 3 [min] must be at least 13 (is 3) (validator; touched: no)',
       ].join('\n'),
     );
   });
@@ -210,7 +210,13 @@ describe('mergePageReport', () => {
 
     expect(expirePages(pages, 300_000)).toBeNull();
     const gone = expirePages(pages, 400_000);
-    expect(gone).toEqual({ forms: [], events: [], reportedAt: 0 });
+    expect(gone).toEqual({
+      forms: [],
+      events: [],
+      reportedAt: 0,
+      setupErrors: [],
+      instrumented: [],
+    });
   });
 });
 

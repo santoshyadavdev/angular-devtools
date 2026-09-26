@@ -66,7 +66,7 @@ describe('real Signal Forms', () => {
     const byKey = Object.fromEntries(root.children!.map((c) => [c.key, c]));
     expect(root.status).toBe(tree().invalid() ? 'INVALID' : 'VALID');
     expect(byKey['name'].errors).toEqual([
-      { kind: 'required', message: 'Name is required', params: undefined },
+      { kind: 'required', message: 'Name is required', params: undefined, source: 'own' },
     ]);
     expect(byKey['tags'].errors[0].message).toBe('needs at least 2 items');
     expect(byKey['plan'].status).toBe('DISABLED');

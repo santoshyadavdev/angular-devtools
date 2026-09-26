@@ -88,19 +88,30 @@ When embedded in Express, the MCP endpoint is also available over HTTP at `/__ng
 
 MCP clients see these with an underscore, as `ng-devtools_get-routes`.
 
-| Tool                               | Description                                                 |
-| ---------------------------------- | ----------------------------------------------------------- |
-| `ng-devtools:get-routes`           | List Angular routes from source                             |
-| `ng-devtools:get-components`       | Discover components and directives, with inputs and outputs |
-| `ng-devtools:get-signals`          | Signal declarations from source                             |
-| `ng-devtools:get-providers`        | DI providers from source                                    |
-| `ng-devtools:build-meta`           | Angular/TS versions, SSR status                             |
-| `ng-devtools:highlight`            | Highlight a component in the page                           |
-| `ng-devtools:inspect-signals`      | Signal graph a connected page reported                      |
-| `ng-devtools:inspect-providers`    | Injector tree a connected page reported                     |
-| `ng-devtools:get-ngrx-store`       | Scan source for NgRx store patterns                         |
-| `ng-devtools:inspect-forms`        | Forms on the page with every field's state and errors       |
-| `ng-devtools:explain-form-invalid` | Which fields make a form invalid, and why                   |
+| Tool                                 | Description                                                 |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `ng-devtools:get-routes`             | List Angular routes from source                             |
+| `ng-devtools:get-components`         | Discover components and directives, with inputs and outputs |
+| `ng-devtools:get-signals`            | Signal declarations from source                             |
+| `ng-devtools:get-providers`          | DI providers from source                                    |
+| `ng-devtools:build-meta`             | Angular/TS versions, SSR status                             |
+| `ng-devtools:highlight`              | Highlight a component in the page                           |
+| `ng-devtools:inspect-signals`        | Signal graph a connected page reported                      |
+| `ng-devtools:inspect-providers`      | Injector tree a connected page reported                     |
+| `ng-devtools:get-ngrx-store`         | Scan source for NgRx store patterns                         |
+| `ng-devtools:inspect-forms`          | Forms on the page with every field's state and errors       |
+| `ng-devtools:explain-form-invalid`   | Which fields make a form invalid, and why                   |
+| `ng-devtools:explain-field`          | One field: error sources, skip reasons, binding, source     |
+| `ng-devtools:explain-submit`         | What submit will do, and why it might do nothing            |
+| `ng-devtools:form-payload`           | What the form sends: value vs raw value, unvalidated fields |
+| `ng-devtools:form-history`           | Change timeline with origin (user, code, devtools)          |
+| `ng-devtools:form-diff`              | Net change since a marker                                   |
+| `ng-devtools:lint-forms`             | Form bugs and model-aware accessibility checks              |
+| `ng-devtools:explain-custom-control` | How a field is bound, and what is wrong with the binding    |
+| `ng-devtools:export-form`            | JSON snapshot or test fixture                               |
+| `ng-devtools:wait-for-form`          | Wait until settled, valid, not pending or submitted         |
+| `ng-devtools:form-action`            | Set, touch, revalidate, reset, submit, focus, snapshot      |
+| `ng-devtools:fill-form`              | Fill several fields through the inputs                      |
 
 #### Forms
 
@@ -110,8 +121,12 @@ The Forms tab and the forms tools read Signal Forms, reactive forms and template
 - `ng-devtools:explain-form-invalid` is the tool to reach for first: without arguments it lists every form that is invalid or waiting on async validation, with each failing field's current value, the validator that failed, its message and whether it was touched. Pass `form` (an id like `form-1`, or part of a label like `SignupComponent`) to explain one form.
 - `ng-devtools:inspect-forms` lists the forms with their status and error counts. Pass `form` for a field tree, plus `path` (e.g. `address.city`), `onlyInvalid` or `includeValues: false` to narrow it down.
 - Both tools note when the page last reported, so an agent can tell when the data is stale.
+- Each error says where it comes from: a validator, a template attribute, a cross-field rule (and on which ancestor), async, parse, a server/submission error, or `setErrors()`. `explain-field` adds why validation is skipped (hidden, disabled, readonly), typed-but-uncommitted values (`updateOn`, `debounce`), stale validity after validator changes, the binding, whether the error text is visible, and the file and line of the form and its rules.
+- Agents can loop: inspect, act (`form-action`, `fill-form`), `wait-for-form`, then `form-diff` from the marker they had. Writes need a development build; `reset`, `submit` and `restore` need `confirm: true`.
+- The Forms tab has Fields (with filters and per-field actions), Timeline, Submit and Lint views. Pick a field on the page to select it, or open a form from its component in the Components tab.
+- Timeline recording (a checkbox in the Timeline view, or `form-action` with `instrument`) adds the calling code of each change, validator changes, async validation times and component renders per keystroke. Array items are tracked by identity, so moves show as moves.
 
-Form values leave the page: they are sent to the devtools server, shown in the Forms tab and returned to agents. Values of password fields, fields with a password, one-time-code or credit-card `autocomplete`, and fields whose name looks secret (password, token, card, cvv and similar) are replaced with `[redacted]`. Other values are sent as they are, so keep real credentials out of forms you inspect, and don't expose the dev server beyond localhost.
+Form values leave the page: they are sent to the devtools server, shown in the Forms tab and returned to agents. Values of password fields, fields with a password, one-time-code or credit-card `autocomplete`, fields inside `.sentry-mask`, `.rr-mask`, `[data-private]` or `[data-ng-devtools="mask"]`, and fields whose name contains a secret word (password, token, card, cvv, apiKey and similar) are replaced with `[redacted]`, and those values are also removed from error messages. `[data-ng-devtools="unmask"]` opts a field back in; `window.__NG_DEVTOOLS_FORMS__ = { mask: ['iban'], unmask: ['passport'] }` does the same by key. DevTools never writes secret fields. Other values are sent as they are, so keep real credentials out of forms you inspect, and don't expose the dev server beyond localhost.
 
 #### Agent Resources
 
