@@ -287,6 +287,72 @@ describe('forms MCP tools', () => {
     );
   });
 
+  it('form-history shows callers, async timing, render counts and moves', async () => {
+    const { push, call } = await boot();
+    await push('push-forms', {
+      pageId: 'pg1',
+      forms: [signup],
+      instrumented: true,
+      events: [
+        {
+          formId: 'form-1@pg1',
+          path: 'email',
+          type: 'value',
+          detail: '"a@b.co"',
+          origin: 'code',
+          caller: 'setValue in Checkout.prefill (src/app/checkout.ts:42:7)',
+          timestamp: 1,
+          seq: 1,
+        },
+        {
+          formId: 'form-1@pg1',
+          path: 'code',
+          type: 'status',
+          detail: 'VALID',
+          ms: 820,
+          timestamp: 2,
+          seq: 2,
+        },
+        {
+          formId: 'form-1@pg1',
+          path: 'email',
+          type: 'value',
+          detail: '"a"',
+          origin: 'user',
+          renders: 14,
+          rendered: ['Checkout×9', 'Summary×5'],
+          timestamp: 3,
+          seq: 3,
+        },
+        {
+          formId: 'form-1@pg1',
+          path: 'items.0',
+          type: 'moved',
+          detail: 'items.2 → items.0',
+          timestamp: 4,
+          seq: 4,
+        },
+        {
+          formId: 'form-1@pg1',
+          path: 'age',
+          type: 'validators',
+          detail: 'setValidators',
+          origin: 'code',
+          timestamp: 5,
+          seq: 5,
+        },
+      ],
+    });
+    const text = await call('form-history', { form: 'Signup' });
+    expect(text).toContain('from setValue in Checkout.prefill (src/app/checkout.ts:42:7)');
+    expect(text).toContain('pending 820ms');
+    expect(text).toContain('14 template updates: Checkout×9, Summary×5');
+    expect(text).toContain('`items.0` moved items.2 → items.0');
+    expect(await call('form-history', { form: 'Signup', type: 'validators' })).toContain(
+      'setValidators',
+    );
+  });
+
   it('lint-forms reports model-aware findings and setup errors', async () => {
     const { call } = await withForms();
     const text = await call('lint-forms', {});

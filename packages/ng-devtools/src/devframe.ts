@@ -113,6 +113,7 @@ const ngDevtools = defineDevframe({
         draft.events = next.events;
         draft.reportedAt = next.reportedAt;
         draft.setupErrors = next.setupErrors ?? [];
+        draft.instrumented = next.instrumented ?? [];
       });
 
     my.rpc.register({
@@ -218,6 +219,18 @@ const ngDevtools = defineDevframe({
           form: typeof args?.form === 'string' ? args.form : undefined,
           page: typeof args?.page === 'string' ? args.page : undefined,
         }),
+    });
+
+    my.rpc.register({
+      name: 'forms-owners',
+      type: 'query',
+      jsonSerializable: true,
+      handler: () =>
+        (formsState.value() as FormsState).forms.map((form) => ({
+          formId: form.id,
+          label: form.label,
+          file: findFormSource(ctx.cwd, form.owner, form.property)?.form?.file ?? null,
+        })),
     });
 
     my.rpc.register({
@@ -592,7 +605,18 @@ const ngDevtools = defineDevframe({
           path: pathProperty,
           type: {
             type: 'string',
-            enum: ['value', 'status', 'touched', 'dirty', 'submit', 'reset', 'added', 'removed'],
+            enum: [
+              'value',
+              'status',
+              'touched',
+              'dirty',
+              'submit',
+              'reset',
+              'added',
+              'removed',
+              'moved',
+              'validators',
+            ],
           },
           origin: { type: 'string', enum: ['user', 'code', 'devtools', 'binding'] },
           since: { type: 'number', description: 'Only events after this marker.' },
@@ -731,7 +755,7 @@ const ngDevtools = defineDevframe({
     ctx.agent.registerTool({
       id: 'ng-devtools:form-action',
       description:
-        'Act on a live form (dev mode). Actions: set-value (mode code or user; user goes through the input like typing), mark-touched, mark-untouched, mark-dirty, mark-pristine, touch-all, revalidate (Signal Forms: reloads async/HTTP validation), reset, enable, disable (reactive only), submit, focus, focus-first-invalid, store-as-global ($form in the page console), snapshot, restore. reset, submit and restore need confirm: true. Secret, hidden and readonly fields are never written; disabled reactive fields need force.',
+        'Act on a live form (dev mode). Actions: set-value (mode code or user; user goes through the input like typing), mark-touched, mark-untouched, mark-dirty, mark-pristine, touch-all, revalidate (Signal Forms: reloads async/HTTP validation), reset, enable, disable (reactive only), submit, focus, focus-first-invalid, store-as-global ($form in the page console), snapshot, restore, instrument (value true or false: record the calling code of form changes, validator changes and template updates per keystroke, shown by form-history). reset, submit and restore need confirm: true. Secret, hidden and readonly fields are never written; disabled reactive fields need force.',
       safety: 'action',
       inputSchema: {
         type: 'object',
@@ -756,6 +780,7 @@ const ngDevtools = defineDevframe({
               'store-as-global',
               'snapshot',
               'restore',
+              'instrument',
             ],
           },
           form: { type: 'string', description: 'Full form id, e.g. form-1@ab12.' },

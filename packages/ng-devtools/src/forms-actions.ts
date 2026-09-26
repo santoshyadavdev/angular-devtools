@@ -31,6 +31,8 @@ export const FORM_ACTIONS = [
   'restore',
   'fill',
   'locate',
+  'instrument',
+  'pick',
 ] as const;
 
 export type FormActionName = (typeof FORM_ACTIONS)[number];
@@ -327,10 +329,11 @@ function locate(ctx: ActionContext, selector: string): FormActionResult {
     return fail(`${selector} is not a valid CSS selector.`);
   }
   if (!target) return fail(`Nothing on the page matches ${selector}.`);
-  const directives = read(
-    () => ctx.ng.getDirectives(target!) ?? [],
-    [] as unknown[],
-  ) as AnyRecord[];
+  return locateElement(ctx, target) ?? fail(`${selector} is not bound to a form field.`);
+}
+
+export function locateElement(ctx: ActionContext, target: Element): FormActionResult | null {
+  const directives = read(() => ctx.ng.getDirectives(target) ?? [], [] as unknown[]) as AnyRecord[];
   for (const [formId, found] of ctx.forms) {
     for (const dir of directives) {
       const state = read(() => dir['state']?.() as AnyRecord | undefined, undefined);
@@ -343,7 +346,7 @@ function locate(ctx: ActionContext, selector: string): FormActionResult {
       }
     }
   }
-  return fail(`${selector} is not bound to a form field.`);
+  return null;
 }
 
 function controlPath(root: AnyRecord, target: AnyRecord): string {

@@ -210,7 +210,13 @@ describe('mergePageReport', () => {
 
     expect(expirePages(pages, 300_000)).toBeNull();
     const gone = expirePages(pages, 400_000);
-    expect(gone).toEqual({ forms: [], events: [], reportedAt: 0, setupErrors: [] });
+    expect(gone).toEqual({
+      forms: [],
+      events: [],
+      reportedAt: 0,
+      setupErrors: [],
+      instrumented: [],
+    });
   });
 });
 

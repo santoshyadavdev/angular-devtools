@@ -93,7 +93,17 @@ export interface CollectedForm {
 export interface FormEvent {
   formId: string;
   path: string;
-  type: 'value' | 'status' | 'touched' | 'dirty' | 'submit' | 'reset' | 'added' | 'removed';
+  type:
+    | 'value'
+    | 'status'
+    | 'touched'
+    | 'dirty'
+    | 'submit'
+    | 'reset'
+    | 'added'
+    | 'removed'
+    | 'moved'
+    | 'validators';
   detail?: string;
   timestamp: number;
   seq?: number;
@@ -102,6 +112,9 @@ export interface FormEvent {
   prev?: string;
   count?: number;
   outcome?: 'ran' | 'blocked' | 'threw' | 'busy';
+  ms?: number;
+  renders?: number;
+  rendered?: string[];
 }
 
 export type EventOrigin = 'user' | 'code' | 'devtools' | 'binding';
@@ -857,6 +870,16 @@ function flatten(node: FormFieldNode, out = new Map<string, FormFieldNode>()) {
   return out;
 }
 
+function byUid(node: FormFieldNode, out = new Map<string, FormFieldNode>()) {
+  if (node.uid) out.set(node.uid, node);
+  for (const child of node.children ?? []) byUid(child, out);
+  return out;
+}
+
+function parentPath(path: string): string {
+  return path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : '';
+}
+
 export function diffForms(
   previous: CollectedForm[],
   next: CollectedForm[],
@@ -871,24 +894,58 @@ export function diffForms(
       events.push({ formId: form.id, path, type, detail, timestamp: now });
     const old = flatten(prevForm.root);
     const current = flatten(form.root);
+    const oldUids = byUid(prevForm.root);
+    const currentUids = byUid(form.root);
+    const find = (
+      node: FormFieldNode,
+      uids: Map<string, FormFieldNode>,
+      paths: Map<string, FormFieldNode>,
+    ) => (node.uid && uids.size ? uids.get(node.uid) : paths.get(node.path));
+    const reportable = (
+      node: FormFieldNode,
+      paths: Map<string, FormFieldNode>,
+      otherUids: Map<string, FormFieldNode>,
+      otherPaths: Map<string, FormFieldNode>,
+    ) => {
+      if (!node.path) return false;
+      const parent = paths.get(parentPath(node.path));
+      return !!parent && parent.type !== 'array' && !!find(parent, otherUids, otherPaths);
+    };
     const resized: string[] = [];
     for (const [path, node] of current) {
       const prev = old.get(path);
       if (node.type !== 'array' || prev?.type !== 'array') continue;
-      const was = prev.children?.length ?? 0;
-      const is = node.children?.length ?? 0;
-      if (was !== is) {
+      const kids = node.children ?? [];
+      const was = prev.children ?? [];
+      if (currentUids.size && oldUids.size && [...kids, ...was].every((c) => !!c.uid)) {
+        kids.forEach((child, index) => {
+          const earlier = oldUids.get(child.uid!);
+          if (!earlier) push(child.path, 'added', `inserted at ${index}`);
+          else if (earlier.path !== child.path) {
+            push(child.path, 'moved', `${earlier.path} → ${child.path}`);
+          }
+        });
+        for (const child of was) {
+          if (!currentUids.has(child.uid!)) push(child.path, 'removed', `was at ${child.key}`);
+        }
+        continue;
+      }
+      if (was.length !== kids.length) {
         resized.push(path);
-        push(path, is > was ? 'added' : 'removed', `${was} → ${is} items`);
+        push(
+          path,
+          kids.length > was.length ? 'added' : 'removed',
+          `${was.length} → ${kids.length} items`,
+        );
       }
     }
     const inResized = (path: string) =>
       resized.some((array) => (array ? path.startsWith(`${array}.`) : path !== ''));
     for (const [path, node] of current) {
       if (inResized(path)) continue;
-      const prev = old.get(path);
+      const prev = find(node, oldUids, old);
       if (!prev) {
-        push(path, 'added');
+        if (reportable(node, current, oldUids, old)) push(path, 'added');
         continue;
       }
       if (node.type === 'control' && JSON.stringify(prev.value) !== JSON.stringify(node.value))
@@ -897,8 +954,9 @@ export function diffForms(
       if (prev.touched !== node.touched) push(path, 'touched', String(node.touched));
       if (prev.dirty !== node.dirty) push(path, 'dirty', String(node.dirty));
     }
-    for (const path of old.keys()) {
-      if (!current.has(path) && !inResized(path)) push(path, 'removed');
+    for (const [path, node] of old) {
+      if (inResized(path) || find(node, currentUids, current)) continue;
+      if (reportable(node, old, currentUids, current)) push(path, 'removed');
     }
   }
   return events;
@@ -914,7 +972,7 @@ function valueOf(node: FormFieldNode): unknown {
   return node.type === 'array' ? entries.map(([, v]) => v) : Object.fromEntries(entries);
 }
 
-function pathTo(root: AnyRecord, target: AnyRecord): string {
+export function controlPathOf(root: AnyRecord, target: AnyRecord): string {
   const keys: string[] = [];
   let current: AnyRecord | null = target;
   while (current && current !== root) {
@@ -948,7 +1006,7 @@ export function controlEventOf(
   { elements = new WeakMap(), rootKey = '', submitted, now = Date.now() }: ControlEventOptions = {},
 ): FormEvent | null {
   const source = read(() => event['source'] as AnyRecord, null);
-  const path = source ? pathTo(root, source) : '';
+  const path = source ? controlPathOf(root, source) : '';
   const base = { formId, path, timestamp: now };
   const of = (key: string) => read(() => (source ?? event)[key], event[key]);
   if ('value' in event) {

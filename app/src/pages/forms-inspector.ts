@@ -1,4 +1,13 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import type { DevframeRpcClient } from 'devframe/client';
 import { FormsFieldDetail } from './forms-field-detail';
@@ -52,6 +61,7 @@ function matchesChip(node: FormFieldNode, chip: Chip): boolean {
 interface FormsSnapshot {
   forms?: CollectedForm[];
   events?: FormEvent[];
+  instrumented?: string[];
 }
 
 interface FieldRow {
@@ -137,6 +147,7 @@ function countFields(node: FormFieldNode): number {
               <button type="button" class="small" (click)="act('focus-first-invalid')">
                 Focus first invalid
               </button>
+              <button type="button" class="small" (click)="pick()">Pick field on page</button>
               <button type="button" class="small" (click)="act('snapshot')">Snapshot</button>
               @if (snapshot()) {
                 <button type="button" class="small" (click)="confirmAct('restore')">
@@ -356,7 +367,11 @@ function countFields(node: FormFieldNode): number {
                   }
                 }
                 @case ('timeline') {
-                  <app-forms-timeline [events]="selectedEvents()" />
+                  <app-forms-timeline
+                    [events]="selectedEvents()"
+                    [recording]="recording()"
+                    (record)="setRecording($event)"
+                  />
                 }
                 @case ('submit') {
                   <app-forms-submit [formId]="form.id" [version]="version()" [rpc]="rpc()" />
@@ -639,12 +654,18 @@ function countFields(node: FormFieldNode): number {
 })
 export class FormsInspector {
   rpc = input<DevframeRpcClient | null>(null);
+  focus = input<string | null>(null);
 
   readonly forms = signal<CollectedForm[]>([]);
   readonly events = signal<FormEvent[]>([]);
   readonly loading = signal(true);
   readonly failed = signal(false);
   readonly selectedId = signal<string | null>(null);
+  readonly instrumented = signal<string[]>([]);
+  readonly recording = computed(() => {
+    const id = this.selected()?.id ?? '';
+    return this.instrumented().some((page) => id.endsWith(`@${page}`));
+  });
   readonly filter = signal('');
   readonly tabs = TABS;
   readonly chips = CHIPS;
@@ -714,6 +735,10 @@ export class FormsInspector {
       const client = this.rpc();
       if (client) this.load(client);
     });
+    effect(() => {
+      const focus = this.focus();
+      if (focus) untracked(() => this.selectForm(focus));
+    });
     this.destroyRef.onDestroy(() => {
       this.unsubscribe?.();
       this.highlight(null, '');
@@ -730,6 +755,7 @@ export class FormsInspector {
         const snapshot = value as FormsSnapshot | undefined;
         this.forms.set(snapshot?.forms ?? []);
         this.events.set(snapshot?.events ?? []);
+        this.instrumented.set(snapshot?.instrumented ?? []);
         this.version.update((v) => v + 1);
       };
       apply(state.value());
@@ -740,6 +766,33 @@ export class FormsInspector {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async pick() {
+    const form = this.selected();
+    if (!form) return;
+    this.message.set('Click a field in the app (Esc cancels).');
+    const result = await formAction(this.rpc(), { action: 'pick', formId: form.id });
+    const picked = result as typeof result & { formId?: string; path?: string };
+    if (!result.ok || !picked.formId) {
+      this.message.set(actionMessage(result));
+      return;
+    }
+    this.selectForm(picked.formId);
+    this.tab_.set('fields');
+    this.fieldPath.set(picked.path ?? '');
+    this.message.set(`Picked ${picked.path || '(form)'}.`);
+  }
+
+  async setRecording(on: boolean) {
+    const form = this.selected();
+    if (!form) return;
+    const result = await formAction(this.rpc(), {
+      action: 'instrument',
+      formId: form.id,
+      value: on,
+    });
+    this.message.set(actionMessage(result));
   }
 
   selectForm(id: string) {

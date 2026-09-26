@@ -11,6 +11,7 @@ export interface FormsState {
   events: FormEvent[];
   reportedAt: number;
   setupErrors?: { pageId: string; message: string }[];
+  instrumented?: string[];
 }
 
 export interface InspectFormsArgs {
@@ -26,6 +27,7 @@ export interface PageReport {
   forms: CollectedForm[];
   events: FormEvent[];
   setupErrors?: string[];
+  instrumented?: boolean;
 }
 
 const STALE_AFTER_MS = 10_000;
@@ -375,6 +377,7 @@ export function isPageReport(value: unknown): value is PageReport {
     report.forms.every(isCollectedForm) &&
     Array.isArray(report.events) &&
     report.events.every(isFormEvent) &&
+    (report.instrumented === undefined || typeof report.instrumented === 'boolean') &&
     (report.setupErrors === undefined ||
       (isStringArray(report.setupErrors) && report.setupErrors.length <= 50))
   );
@@ -395,6 +398,7 @@ function stateOf(pages: Pages): FormsState {
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(-MAX_EVENTS),
     reportedAt: all.length ? Math.min(...all.map((page) => page.reportedAt)) : 0,
+    instrumented: all.filter((page) => page.instrumented).map((page) => page.pageId),
     setupErrors: all.flatMap((page) =>
       (page.setupErrors ?? []).map((message) => ({ pageId: page.pageId, message })),
     ),

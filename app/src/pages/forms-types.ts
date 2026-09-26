@@ -65,6 +65,10 @@ export interface FormEvent {
   prev?: string;
   count?: number;
   outcome?: string;
+  caller?: string;
+  ms?: number;
+  renders?: number;
+  rendered?: string[];
 }
 
 export interface FormLintFinding {

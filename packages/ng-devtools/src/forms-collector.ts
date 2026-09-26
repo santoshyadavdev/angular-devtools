@@ -1,5 +1,6 @@
 import {
   collectForms,
+  controlPathOf,
   detailOf,
   diffForms,
   findFieldElement,
@@ -14,7 +15,22 @@ import {
   type FormFieldNode,
   type FoundForm,
 } from './forms.ts';
-import { isDevtoolsAction, isFormAction, runFormAction } from './forms-actions.ts';
+import {
+  isDevtoolsAction,
+  isFormAction,
+  locateElement,
+  runFormAction,
+  type ActionContext,
+  type FormActionResult,
+} from './forms-actions.ts';
+import {
+  VALIDATOR_METHODS,
+  countRenders,
+  instrumentForms,
+  type InstrumentCall,
+  type Instrumentation,
+  type RenderCounter,
+} from './forms-instrument.ts';
 import { redactMessage } from './forms-privacy.ts';
 
 type AnyRecord = Record<string, any>;
@@ -36,6 +52,7 @@ const HEARTBEAT_MS = 5000;
 const PUSH_DELAY_MS = 80;
 const MAX_SETUP_ERRORS = 20;
 const MERGE_MS = 2000;
+const PICK_TIMEOUT_MS = 12_000;
 const DIFFED_FOR_ALL: FormEvent['type'][] = [
   'value',
   'status',
@@ -116,6 +133,14 @@ export function attachForms(
   let userTimer: ReturnType<typeof setTimeout> | undefined;
   let pushTimer: ReturnType<typeof setTimeout> | undefined;
   let submittingForm: string | null = null;
+  let instrumentation: Instrumentation | null = null;
+  let renders: RenderCounter | null = null;
+  let renderSince: number | null = null;
+  let pendingCaller: { formId: string; text: string } | null = null;
+  const signalCallers = new Map<string, string>();
+  const pendingStarted = new Map<string, number>();
+  let cancelPick: (() => void) | null = null;
+  const ownerNames = new Set<string>();
 
   const originNow = (): EventOrigin =>
     isDevtoolsAction() ? 'devtools' : userActive ? 'user' : 'code';
@@ -124,6 +149,17 @@ export function attachForms(
     const event: FormEvent = { ...input, seq: ++eventSeq };
     if (infer) event.origin ??= originNow();
     const key = `${event.formId}:${event.path}`;
+    if (pendingCaller?.formId === event.formId && !event.caller && event.origin !== 'devtools') {
+      event.caller = pendingCaller.text;
+    }
+    if (event.type === 'status') {
+      const next = event.detail?.split('→').pop()?.trim();
+      if (next === 'PENDING') pendingStarted.set(key, event.timestamp);
+      else if (pendingStarted.has(key)) {
+        event.ms = event.timestamp - pendingStarted.get(key)!;
+        pendingStarted.delete(key);
+      }
+    }
     if (event.type === 'value') {
       const previous = lastValue.get(key);
       if (previous === event.detail) return;
@@ -263,18 +299,38 @@ export function attachForms(
       const streamed = new Set(Array.from(watched.values(), ({ formId }) => formId));
       for (const event of diffForms(lastForms, forms)) {
         if (!streamed.has(event.formId) || DIFFED_FOR_ALL.includes(event.type)) {
+          const caller = signalCallers.get(event.formId);
           const origin: EventOrigin | undefined = devtoolsSincePush
             ? 'devtools'
             : userSincePush
               ? 'user'
-              : undefined;
-          recordFormEvent(origin ? { ...event, origin } : event, false);
+              : caller !== undefined
+                ? 'code'
+                : undefined;
+          const tagged: FormEvent = origin ? { ...event, origin } : event;
+          if (caller && origin !== 'devtools') tagged.caller = caller;
+          recordFormEvent(tagged, false);
         }
       }
       lastForms = forms;
+      for (const form of forms) ownerNames.add(form.owner);
       userSincePush = false;
       devtoolsSincePush = false;
-      const report = { pageId, forms, events: formEvents, setupErrors };
+      signalCallers.clear();
+      attachRenders();
+      if (instrumentation) {
+        for (const form of found.forms) {
+          if (form.kind === 'signal') instrumentation.addSignalRoot(form.root);
+          else instrumentation.addControl(form.root);
+        }
+      }
+      const report = {
+        pageId,
+        forms,
+        events: formEvents,
+        setupErrors,
+        instrumented: !!instrumentation,
+      };
       const payload = JSON.stringify(report);
       if (payload === lastPayload && now - lastPushAt < HEARTBEAT_MS) return;
       lastPayload = payload;
@@ -293,8 +349,122 @@ export function attachForms(
     }, PUSH_DELAY_MS);
   }
 
+  function attachRenders() {
+    if (!renders || renderSince === null) return;
+    const since = renderSince;
+    const taken = renders.take();
+    renderSince = null;
+    if (!taken) return;
+    for (let i = formEvents.length - 1; i >= 0; i--) {
+      const event = formEvents[i];
+      if ((event.seq ?? 0) <= since) break;
+      if (event.type === 'value' && event.origin === 'user') {
+        event.renders = taken.total;
+        event.rendered = taken.top;
+        return;
+      }
+    }
+  }
+
+  function onInstrumentedCall(call: InstrumentCall) {
+    if (isDevtoolsAction()) return;
+    const root = call.signalRoot ?? read(() => call.target['root'] as AnyRecord, null);
+    if (!root) return;
+    const formId = idOf(root);
+    if (!foundById.has(formId)) return;
+    const text = call.caller ? `${call.method} in ${call.caller}` : '';
+    if (call.signalRoot) {
+      if (!signalCallers.get(formId)) signalCallers.set(formId, text);
+      schedulePush();
+      return;
+    }
+    if (VALIDATOR_METHODS.includes(call.method)) {
+      if (!call.caller) return;
+      recordFormEvent({
+        formId,
+        path: read(() => controlPathOf(root, call.target), ''),
+        type: 'validators',
+        detail: call.method,
+        caller: call.caller,
+        origin: 'code',
+        timestamp: Date.now(),
+      });
+      schedulePush();
+      return;
+    }
+    if (!text) return;
+    pendingCaller = { formId, text };
+    setTimeout(() => {
+      if (pendingCaller?.text === text) pendingCaller = null;
+    }, 0);
+  }
+
+  function setInstrumented(on: boolean): FormActionResult {
+    if (on && !instrumentation) {
+      instrumentation = instrumentForms(onInstrumentedCall, ownerNames);
+      renders = countRenders(getNg());
+      void pushForms();
+      return {
+        ok: true,
+        message: renders
+          ? 'Recording callers, validator changes and renders per keystroke.'
+          : 'Recording callers and validator changes (render counts need Angular debug APIs).',
+      };
+    }
+    if (!on && instrumentation) {
+      instrumentation.stop();
+      renders?.stop();
+      instrumentation = null;
+      renders = null;
+      void pushForms();
+    }
+    return { ok: true, message: on ? 'Already recording.' : 'Stopped recording.' };
+  }
+
+  function pick(ctx: ActionContext): Promise<FormActionResult> {
+    cancelPick?.();
+    const failed = (message: string): FormActionResult => ({ ok: false, message, error: message });
+    return new Promise((resolve) => {
+      const finish = (result: FormActionResult) => {
+        document.removeEventListener('click', onClick, true);
+        document.removeEventListener('mouseover', onHover, true);
+        document.removeEventListener('keydown', onKey, true);
+        clearTimeout(timer);
+        highlight.clear();
+        cancelPick = null;
+        resolve(result);
+      };
+      const onHover = (event: Event) => {
+        if (event.target instanceof HTMLElement) highlight.show(event.target);
+      };
+      const onClick = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const target = event.target instanceof Element ? event.target : null;
+        const field =
+          target?.closest('input, select, textarea, [formcontrolname], [ngmodel]') ?? target;
+        finish(
+          (field && locateElement(ctx, field)) ??
+            failed('That element is not bound to a form field.'),
+        );
+      };
+      const onKey = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') finish(failed('Picking cancelled.'));
+      };
+      const timer = setTimeout(() => finish(failed('No field was picked.')), PICK_TIMEOUT_MS);
+      cancelPick = () => finish(failed('Picking cancelled.'));
+      document.addEventListener('click', onClick, true);
+      document.addEventListener('mouseover', onHover, true);
+      document.addEventListener('keydown', onKey, true);
+    });
+  }
+
   const onUserEvent = (event: Event) => {
     if (!isDevtoolsAction()) userSincePush = true;
+    if (renders && renderSince === null && (event.type === 'input' || event.type === 'change')) {
+      renderSince = eventSeq;
+      renders.start();
+    }
     userActive = true;
     clearTimeout(userTimer);
     userTimer = setTimeout(() => (userActive = false), 0);
@@ -409,16 +579,19 @@ export function attachForms(
         }
         if (!el) return;
       }
+      const ctx: ActionContext = {
+        ng,
+        forms: foundById,
+        elements: fieldElements,
+        all: () => document.querySelectorAll('*'),
+      };
+      if (request.action === 'instrument') return respond(setInstrumented(request.value !== false));
+      if (request.action === 'pick') {
+        void pick(ctx).then(respond);
+        return;
+      }
       devtoolsSincePush = true;
-      runFormAction(
-        {
-          ng,
-          forms: foundById,
-          elements: fieldElements,
-          all: () => document.querySelectorAll('*'),
-        },
-        request,
-      ).then(
+      runFormAction(ctx, request).then(
         (result) => {
           respond(result);
           void pushForms();
@@ -439,6 +612,11 @@ export function attachForms(
       for (const { stop } of watched.values()) stop();
       watched.clear();
       for (const unwrap of unwrapSubmits.splice(0)) unwrap();
+      cancelPick?.();
+      instrumentation?.stop();
+      renders?.stop();
+      instrumentation = null;
+      renders = null;
     },
   };
 }

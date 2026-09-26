@@ -156,6 +156,67 @@ describe('forms collector', () => {
     expect(fixture.componentInstance.form.controls.email.touched).toBe(true);
   });
 
+  it('records callers, validator changes and async timing once instrumented', async () => {
+    const fixture = await mount(Login);
+    const h = harness();
+    h.collector.push();
+    await tick();
+    const formId = h.reports().at(-1).forms[0].id;
+    h.handlers.get('form-action')!({
+      requestId: 'i1',
+      request: { action: 'instrument', formId, value: true },
+    });
+    await tick();
+    expect(h.reports().at(-1).instrumented).toBe(true);
+    const email = fixture.componentInstance.form.controls.email;
+    function prefillFromProfile() {
+      email.setValue('kam@example.com');
+    }
+    prefillFromProfile();
+    function checkAvailability() {
+      email.setAsyncValidators(() => new Promise((resolve) => setTimeout(() => resolve(null), 40)));
+    }
+    checkAvailability();
+    email.updateValueAndValidity();
+    await tick(200);
+    const events = h.lastEvents();
+    const value = events.find((e) => e.type === 'value' && e.detail === '"kam@example.com"');
+    expect(value).toMatchObject({ origin: 'code' });
+    expect(value?.caller).toContain('prefillFromProfile');
+    expect(events.find((e) => e.type === 'validators')).toMatchObject({
+      path: 'email',
+      detail: 'setAsyncValidators',
+    });
+    const settled = events.filter(
+      (e) => e.type === 'status' && e.path === 'email' && e.ms !== undefined,
+    );
+    expect(settled.at(-1)!.ms).toBeGreaterThanOrEqual(30);
+    h.handlers.get('form-action')!({
+      requestId: 'i2',
+      request: { action: 'instrument', formId, value: false },
+    });
+    await tick();
+    expect(h.reports().at(-1).instrumented).toBe(false);
+  });
+
+  it('lets the user pick a field on the page', async () => {
+    await mount(Login);
+    const h = harness();
+    h.collector.push();
+    await tick();
+    const formId = h.reports().at(-1).forms[0].id;
+    h.handlers.get('form-action')!({ requestId: 'p1', request: { action: 'pick', formId } });
+    await tick(20);
+    const clicked = document.getElementById('email')!;
+    let reachedApp = false;
+    clicked.addEventListener('click', () => (reachedApp = true));
+    clicked.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await tick(20);
+    const answer = h.calls.find((c) => c.name === 'form-action-result')!.args[0];
+    expect(answer.result).toMatchObject({ ok: true, formId, path: 'email' });
+    expect(reachedApp).toBe(false);
+  });
+
   it('captures NG01xxx setup errors from console.error without leaking tokens', async () => {
     const original = console.error;
     console.error = () => {};

@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { FORMS_STYLES, type FormEvent } from './forms-types';
 
 const ORIGINS = ['all', 'user', 'code', 'devtools'] as const;
@@ -6,6 +6,10 @@ const ORIGINS = ['all', 'user', 'code', 'devtools'] as const;
 @Component({
   selector: 'app-forms-timeline',
   template: `
+    <label class="record">
+      <input type="checkbox" [checked]="recording()" (change)="record.emit(!recording())" />
+      Record calling code, validator changes and renders per keystroke
+    </label>
     <fieldset class="chips">
       <legend class="sr-only">Show changes from</legend>
       @for (origin of origins; track origin) {
@@ -44,6 +48,19 @@ const ORIGINS = ['all', 'user', 'code', 'devtools'] as const;
             }
             @if (event.origin) {
               <span class="tag">{{ event.origin }}</span>
+            }
+            @if (event.ms !== undefined) {
+              <span class="tag" [attr.data-tone]="event.ms > 1000 ? 'warn' : ''"
+                >pending {{ event.ms }}ms</span
+              >
+            }
+            @if (event.renders) {
+              <span class="tag" [attr.data-tone]="event.renders > 20 ? 'warn' : ''"
+                >{{ event.renders }} renders: {{ (event.rendered ?? []).join(', ') }}</span
+              >
+            }
+            @if (event.caller) {
+              <span class="caller">from {{ event.caller }}</span>
             }
           </li>
         }
@@ -108,10 +125,24 @@ const ORIGINS = ['all', 'user', 'code', 'devtools'] as const;
     .detail {
       overflow-wrap: anywhere;
     }
+    .record {
+      color: #d4d4d8;
+      font-size: 13px;
+    }
+    .caller {
+      flex-basis: 100%;
+      padding-left: 16px;
+      color: #a1a1aa;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
   `,
 })
 export class FormsTimeline {
   events = input.required<FormEvent[]>();
+  recording = input(false);
+  readonly record = output<boolean>();
 
   readonly origins = ORIGINS;
   readonly filter = signal<(typeof ORIGINS)[number]>('all');

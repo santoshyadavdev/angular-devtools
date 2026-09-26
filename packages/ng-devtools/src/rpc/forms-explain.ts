@@ -212,10 +212,13 @@ function eventLine(event: FormEvent): string {
     event.origin,
     event.count && event.count > 1 ? `×${event.count}` : '',
     event.outcome ?? '',
+    event.ms !== undefined ? `pending ${event.ms}ms` : '',
+    event.renders ? `${event.renders} template updates: ${(event.rendered ?? []).join(', ')}` : '',
   ]
     .filter(Boolean)
     .join(', ');
-  return `- #${event.seq ?? '?'} ${time} ${code(event.path || '(form)')} ${event.type} ${change}${extra ? ` (${extra})` : ''}`;
+  const caller = event.caller ? ` from ${event.caller}` : '';
+  return `- #${event.seq ?? '?'} ${time} ${code(event.path || '(form)')} ${event.type} ${change}${extra ? ` (${extra})` : ''}${caller}`;
 }
 
 function blockingLeaves(root: FormFieldNode) {
