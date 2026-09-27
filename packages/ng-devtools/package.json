@@ -16,7 +16,8 @@
   "exports": {
     ".": "./src/devframe.ts",
     "./devframe": "./src/devframe.ts",
-    "./overlay": "./src/overlay.ts",
+    "./overlay": "./src/overlay-auto.ts",
+    "./overlay/manual": "./src/overlay.ts",
     "./popup": "./src/popup.ts",
     "./package.json": "./package.json"
   },
@@ -24,7 +25,8 @@
     "exports": {
       ".": "./dist/devframe.mjs",
       "./devframe": "./dist/devframe.mjs",
-      "./overlay": "./dist/overlay.mjs",
+      "./overlay": "./dist/overlay-auto.mjs",
+      "./overlay/manual": "./dist/overlay.mjs",
       "./popup": "./dist/popup.mjs",
       "./package.json": "./package.json"
     }
