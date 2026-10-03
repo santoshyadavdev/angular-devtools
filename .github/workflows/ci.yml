@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The release runs this same gate on the commit it releases.
+  workflow_call:
 
 permissions:
   contents: read
@@ -28,6 +30,8 @@ jobs:
       - uses: ./.github/actions/setup
 
       - uses: nrwl/nx-set-shas@v4
+        with:
+          workflow-id: ci.yml
 
       - name: Check formatting
         run: pnpm format:check

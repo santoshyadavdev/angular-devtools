@@ -1,10 +1,10 @@
 ---
 title: Publishing
-description: Bump the version, build, and publish the npm package. Ship the Chrome extension with a fresh UI.
+description: Release the npm package from GitHub Actions, check it from a local registry, and ship the Chrome extension with a fresh UI.
 ---
 
 <ngmd-hero title="Publishing" gradient>
-  One npm package and one Chrome extension, each with its own version. Bump, build, publish.
+  One npm package and one Chrome extension, on the same version. The package releases from a workflow; the extension ships by hand.
 </ngmd-hero>
 
 # Publishing
@@ -43,19 +43,94 @@ The package's `build` script runs two steps:
 
 `prepack` runs `pnpm build`, so every publish builds first.
 
-## Publish the npm package
+## Release from GitHub Actions
+
+The **Release** workflow (`.github/workflows/release.yml`) publishes the package from `main`. It runs by hand from the Actions tab, and publishes through npm trusted publishing, so no npm token is stored anywhere.
+
+### Set it up once
+
+<ngmd-workflow>
+  <ngmd-step title="Add the trusted publisher">
+    On npmjs.com, open the settings of <code>&#64;santoshyadavdev/ng-devtools</code>, and under <strong>Trusted publishing</strong> choose GitHub Actions with owner <code>santoshyadavdev</code>, repository <code>angular-devtools</code> and workflow <code>release.yml</code>. Leave the environment empty.
+  </ngmd-step>
+  <ngmd-step title="Let the workflow push to main">
+    The workflow pushes the version commit and the tag with the default <code>GITHUB_TOKEN</code>. If a branch protection rule or ruleset guards <code>main</code>, allow GitHub Actions to bypass it.
+  </ngmd-step>
+</ngmd-workflow>
+
+### Each release
+
+1. In a pull request, add a section for the version to `packages/ng-devtools/CHANGELOG.md`, headed with the version alone, like `## 0.0.7`. The changelog follows [Keep a Changelog](https://keepachangelog.com), with entries grouped as Upgrade notes, Security fixes, Features, Fixes and Documentation.
+2. If `app/` changed since the last release, check that `extension/ui` is current. CI fails when it is stale.
+3. Once the pull request is merged and CI is green on `main`, run **Release** from the Actions tab on `main`. Its input is an exact version (`0.0.7`), or `patch`, or `minor` for a breaking change.
+
+### What the workflow does
+
+| Step                | What happens                                                                                                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI                  | Runs `ci.yml` on the commit being released.                                                                                                                                 |
+| Version             | Sets `version` in `packages/ng-devtools/package.json` and `extension/manifest.json`, and the `ng-devtools v<version>` banner in the docs samples.                           |
+| Check the changelog | Fails unless `CHANGELOG.md` has a `## <version>` section. That section becomes the release notes.                                                                           |
+| Build               | `pnpm pack` builds the library and the UI into one tarball, with `publishConfig.exports` applied.                                                                           |
+| Verify the tarball  | `pnpm verify:publish` installs that tarball into a fresh Angular CLI app from a local registry, builds it, and checks the hub. See [Check the package](#check-the-package). |
+| Publish             | `npm publish --provenance` publishes the tarball on the `latest` tag.                                                                                                       |
+| Push and tag        | Commits `chore(release): ng-devtools <version>` to `main` and tags it `ng-devtools@<version>`.                                                                              |
+| GitHub release      | Creates a release for the tag, with the changelog section as its notes.                                                                                                     |
+
+If the workflow fails before it publishes, nothing has left the runner. Fix the cause and run it again. If it fails after it publishes, run it again with the same exact version (not a bump). It skips the publish when that version is already on npm and finishes the rest.
+
+## Check the package
+
+`pnpm verify:publish` checks what npm gets, which the workspace never uses: it links the package to its TypeScript sources.
+
+<ngmd-workflow>
+  <ngmd-step title="Pack">
+    <code>pnpm pack</code> builds the package and checks that the tarball holds every exported file and the UI.
+  </ngmd-step>
+  <ngmd-step title="Publish locally">
+    It starts Verdaccio with <code>pnpm dlx</code> and publishes the tarball there. The registry serves <code>&#64;santoshyadavdev/*</code> only from what it was given, and proxies everything else to npmjs.
+  </ngmd-step>
+  <ngmd-step title="Set up an app">
+    It creates a fresh app, installs the package and <code>devframe</code> from that registry, and wires the setup from the getting-started pages.
+  </ngmd-step>
+  <ngmd-step title="Build and check">
+    It builds the app, starts it, and checks that the hub answers <code>/__devframes/__connection.json</code> and serves the panel.
+  </ngmd-step>
+</ngmd-workflow>
+
+| Scenario                    | App                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `angular-cli` (the default) | `ng new --ssr` on the newest Angular in the peer range, with the [Express hub](../getting-started/express.md) and a development build |
+| `analog`                    | `create-analog`, with the [Vite plugin](../getting-started/vite.md), `vite build`, and the check on the dev server                    |
+
+```bash
+pnpm verify:publish
+pnpm verify:publish --scenario=analog
+```
+
+It uses ports 4873 (the registry) and 4874 (the app). Set `VERIFY_PORT` to move both. It needs network access to npmjs, and a run takes a few minutes. At the end it prints the versions it resolved. On a failure it leaves the app and the logs in a temporary folder and prints where.
+
+### The weekly check
+
+The package declares `@angular/core >=20` and `vite >=5` as peer ranges, and this repository tests on the versions it pins. The **Latest versions** workflow (`.github/workflows/latest.yml`) runs both scenarios every Monday at 06:00 UTC, and by hand from the Actions tab, on the newest versions those ranges allow. The job summary lists the versions each scenario resolved. A scheduled failure opens an issue titled `ci: the <scenario> setup fails on the latest versions`, or comments on the one already open. Close it once the fix is in.
+
+## Publish by hand
+
+Use this only if the workflow can't run.
 
 ### 1. Bump the version
 
-Update `version` in `packages/ng-devtools/package.json`. In the same commit, add a section for the version to `packages/ng-devtools/CHANGELOG.md`. The changelog follows [Keep a Changelog](https://keepachangelog.com), with entries grouped as Upgrade notes, Security fixes, Features and Documentation. Use a message like `chore(release): ng-devtools 0.0.5`.
+Update `version` in `packages/ng-devtools/package.json` and `extension/manifest.json`, and the `ng-devtools v<version>` banner in `getting-started/cli.md` and `getting-started/angular-native.md`. In the same commit, add a section for the version to `packages/ng-devtools/CHANGELOG.md`. Use a message like `chore(release): ng-devtools 0.0.7`.
 
 ### 2. Check the build
 
-Run the checks from [Development setup](./development.md), then build the package without publishing:
+Run the checks from [Development setup](./development.md), then build and check the package without publishing:
 
 ```bash
-pnpm devtools:build-pkg
+pnpm verify:publish
 ```
+
+It builds the package first. See [Check the package](#check-the-package).
 
 ### 3. Refresh the extension UI
 
@@ -67,7 +142,7 @@ If `app/` changed since the last release, run `pnpm extension:build` and commit 
 pnpm devtools:publish
 ```
 
-This runs `pnpm --filter @santoshyadavdev/ng-devtools publish --access public`. The `prepack` build bundles the library and the UI.
+This runs `pnpm --filter @santoshyadavdev/ng-devtools publish --access public`. The `prepack` build bundles the library and the UI. It publishes without provenance, and needs an npm login with publish rights.
 
 <ngmd-alert severity="important">
   <code>pnpm publish</code> checks git before it publishes. Run it from a clean working tree on <code>main</code>.
@@ -75,12 +150,10 @@ This runs `pnpm --filter @santoshyadavdev/ng-devtools publish --access public`. 
 
 ## Release the Chrome extension
 
-The extension has its own version, in `extension/manifest.json`. It does not follow the npm package version.
+The extension's version, in `extension/manifest.json`, follows the npm package. The **Release** workflow sets it, but doesn't upload the extension.
 
-1. Bump `version` in `extension/manifest.json`.
-2. Run `pnpm extension:zip`. It rebuilds `extension/ui` first.
-3. Commit `extension/ui` and the manifest.
-4. Upload `dist/ng-devtools-extension.zip`.
+1. After a release, run `pnpm extension:zip` on `main`. It rebuilds `extension/ui` first.
+2. Upload `dist/ng-devtools-extension.zip`.
 
 See [Build the extension](./chrome-extension.md) for the upload steps.
 

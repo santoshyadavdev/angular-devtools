@@ -78,7 +78,7 @@ This runs `extension:build`, then writes `dist/ng-devtools-extension.zip`. The z
 
 ### Upload
 
-1. Bump `version` in `extension/manifest.json`.
+1. Check that `version` in `extension/manifest.json` is the version to ship. The **Release** workflow sets it to the npm package version; see [Release the Chrome extension](./publishing.md#release-the-chrome-extension).
 2. Go to the <a href="https://chrome.google.com/webstore/devconsole" target="_blank" rel="noopener noreferrer">Chrome Developer Dashboard</a>.
 3. Click **New item** (or open the existing item) and upload the zip.
 4. Fill in the listing details and submit for review.
