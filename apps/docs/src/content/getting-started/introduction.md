@@ -3,7 +3,7 @@ title: Introduction
 description: What the devtools inspect, and the ways you can run them.
 ---
 
-<ngmd-hero title="Angular DevTools" logo="/logo-mark.svg" gradient>
+<ngmd-hero title="Pangular Inspector" logo="/logo-mark.svg" gradient>
   Inspect components, signals, injectors, routes, forms, pipes, NgRx stores and HTTP calls. In the page, from the command line, or through a coding agent.
 </ngmd-hero>
 
@@ -14,7 +14,7 @@ The devtools inspect a running *Angular app. They read components, signals, inje
 The same tool runs in several places. It is built with *Devframe, so one definition powers every mode.
 
 <ngmd-callout type="info" title="One package">
-  Everything ships in <code>&#64;santoshyadavdev/ng-devtools</code>: the server side, the browser overlay, the in-page popup, the CLI and the built UI. See <a href="./installation.md">Installation</a>.
+  Everything ships in <code>&#64;pangular-inspector/core</code>: the server side, the browser overlay, the in-page popup, the CLI and the built UI. See <a href="./installation.md">Installation</a>.
 </ngmd-callout>
 
 ## What it inspects
@@ -86,7 +86,7 @@ Your app's server hosts the devtools, and a script in the page sends live data t
 | Static report  | An offline HTML build of the source scan.                        |
 | MCP server     | Every inspector exposed to coding agents over stdio.             |
 
-All three come from the `ng-devtools` binary. See [Standalone CLI](./cli.md).
+All three come from the `pangular` binary. See [Standalone CLI](./cli.md).
 
 ## Built on Devframe
 

@@ -51,18 +51,18 @@ describe('extension devtools page', () => {
   it('creates the panel when the worker knows the tab', async () => {
     const page = vi.fn(() => false);
     const { panels } = await open({ worker: true, page });
-    expect(panels).toEqual(['Angular DevTools']);
+    expect(panels).toEqual(['Pangular Inspector']);
     expect(page).not.toHaveBeenCalled();
   });
 
   it('asks the page when the worker restarted and forgot the tab', async () => {
     const { panels } = await open({ worker: false, page: () => true });
-    expect(panels).toEqual(['Angular DevTools']);
+    expect(panels).toEqual(['Pangular Inspector']);
   });
 
   it('asks the page when no worker answers', async () => {
     const { panels } = await open({ worker: undefined, page: () => true });
-    expect(panels).toEqual(['Angular DevTools']);
+    expect(panels).toEqual(['Pangular Inspector']);
   });
 
   it('keeps asking while a lazy app bootstraps, then stops', async () => {
@@ -74,7 +74,7 @@ describe('extension devtools page', () => {
     expect(panels).toEqual([]);
     angular = true;
     vi.advanceTimersByTime(500);
-    expect(panels).toEqual(['Angular DevTools']);
+    expect(panels).toEqual(['Pangular Inspector']);
     const checks = page.mock.calls.length;
     vi.advanceTimersByTime(10_000);
     expect(page).toHaveBeenCalledTimes(checks);
@@ -96,6 +96,6 @@ describe('extension devtools page', () => {
     navigated();
     detected(7);
     detected(8);
-    expect(panels).toEqual(['Angular DevTools']);
+    expect(panels).toEqual(['Pangular Inspector']);
   });
 });

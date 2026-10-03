@@ -60,7 +60,7 @@ async function detectConnection() {
   const page = toURL(await evalInPage('location.origin'));
   if (run !== detection) return;
   if (!page || !['http:', 'https:'].includes(page.protocol)) {
-    showStatus('Angular DevTools connects to pages served over http or https.');
+    showStatus('Pangular Inspector connects to pages served over http or https.');
     return;
   }
 
@@ -69,7 +69,7 @@ async function detectConnection() {
   const granted = await chrome.permissions.contains(access);
   if (run !== detection) return;
   if (!granted) {
-    showStatus(`Allow Angular DevTools to reach the devtools server on ${page.host}.`, {
+    showStatus(`Allow Pangular Inspector to reach the devtools server on ${page.host}.`, {
       allow: async () => {
         if (await chrome.permissions.request(access)) detectConnection();
       },

@@ -115,7 +115,7 @@ describe('extension panel bridge', () => {
     });
     await vi.advanceTimersByTimeAsync(500);
     expect(panel.message()).toBe(
-      'Allow Angular DevTools to reach the devtools server on app.example.com.',
+      'Allow Pangular Inspector to reach the devtools server on app.example.com.',
     );
     expect(panel.allow.hidden).toBe(false);
     expect(panel.fetch).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe('extension panel bridge', () => {
     await vi.advanceTimersByTimeAsync(500);
     panel.allow.click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(panel.message()).toMatch(/^Allow Angular DevTools/);
+    expect(panel.message()).toMatch(/^Allow Pangular Inspector/);
     expect(panel.fetch).not.toHaveBeenCalled();
   });
 

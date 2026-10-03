@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-Angular DevTools is in early development. Only the latest published release of
-`@santoshyadavdev/ng-devtools` is supported. There are no older release lines to backport a fix to.
+Pangular Inspector is in early development. Only the latest published release of
+`@pangular-inspector/core` is supported. There are no older release lines to backport a fix to.
 
 ## Reporting a vulnerability
 

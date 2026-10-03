@@ -52,7 +52,7 @@ import { SHARED_STYLES, sourceLocation, type SourceRoute } from './router-types'
             <p class="empty-title">Could not scan the route files.</p>
             <p class="muted">
               @if (staticReport()) {
-                Run <code>ng-devtools build</code> again to rebuild the report.
+                Run <code>pangular build</code> again to rebuild the report.
               } @else {
                 Check that the dev server is running, then refresh.
               }

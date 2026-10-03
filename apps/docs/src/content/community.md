@@ -9,7 +9,7 @@ description: Where to ask questions, report bugs and support the project.
 
 # Get involved
 
-Angular DevTools is open source under the MIT license. Here is where to reach the people behind it, and how to help.
+Pangular Inspector is open source under the MIT license. Here is where to reach the people behind it, and how to help.
 
 ## Maintainers
 
@@ -43,7 +43,7 @@ Angular DevTools is open source under the MIT license. Here is where to reach th
 
 A good bug report saves a round-trip. Include:
 
-- your Angular version and the version of `@santoshyadavdev/ng-devtools`,
+- your Angular version and the version of `@pangular-inspector/core`,
 - your setup: Angular CLI and Express, Vite and Analog, or the standalone CLI,
 - the tab that misbehaves, and what you expected to see,
 - a small reproduction, if you can.

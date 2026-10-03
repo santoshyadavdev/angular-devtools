@@ -36,7 +36,7 @@ function hubUiClientDir(): string | undefined {
 function hubUi() {
   const ui = createUi({
     branding: {
-      productName: 'Angular DevTools',
+      productName: 'Pangular Inspector',
       logo: `data:image/svg+xml,${encodeURIComponent(LOGO)}`,
       primaryColor: '#f5a524',
     },

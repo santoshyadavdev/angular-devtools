@@ -15,7 +15,7 @@
       "@/*": ["./src/*"],
       "@nativescript/core": ["./node_modules/@nativescript/core"],
       "@nativescript/core/*": ["./node_modules/@nativescript/core/*"],
-      "@santoshyadavdev/ng-devtools/*": ["../../packages/ng-devtools/dist/*.mjs"]
+      "@pangular-inspector/core/*": ["../../packages/ng-devtools/dist/*.mjs"]
     }
   },
   "include": ["src/tests/**/*.ts", "src/**/*.ios.ts", "src/**/*.android.ts"],

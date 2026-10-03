@@ -1,14 +1,14 @@
-# Angular DevTools
+# Pangular Inspector
 
-Inspect Angular component trees, signals, dependency injection, routes, forms, pipes and NgRx stores at dev time, build time, or through a coding agent. Built with [Devframe](https://devfra.me) so the same tool runs as an embedded panel, standalone CLI, static report, MCP server, or Chrome DevTools extension.
+The unified Angular devtools. Inspect Angular component trees, signals, dependency injection, routes, forms, pipes and NgRx stores at dev time, build time, or through a coding agent. Built with [Devframe](https://devfra.me) so the same tool runs as an embedded panel, standalone CLI, static report, MCP server, or Chrome DevTools extension.
 
 ## Get started
 
 ```sh
-npm install @santoshyadavdev/ng-devtools devframe
+npm install @pangular-inspector/core devframe
 ```
 
-Then follow the [installation guide](./apps/docs/src/content/getting-started/installation.md) for your setup: Angular CLI with Express, Vite and Analog, the standalone CLI, or [Angular Native](./apps/docs/src/content/getting-started/angular-native.md). For a coding agent, run `npx @santoshyadavdev/ng-devtools mcp`.
+Then follow the [installation guide](./apps/docs/src/content/getting-started/installation.md) for your setup: Angular CLI with Express, Vite and Analog, the standalone CLI, or [Angular Native](./apps/docs/src/content/getting-started/angular-native.md). For a coding agent, run `npx @pangular-inspector/core mcp`.
 
 ## Documentation
 
@@ -39,10 +39,10 @@ Join the conversation, ask questions, and share feedback on [Discord](https://di
 
 ## Sponsors
 
-Angular DevTools is free and open source. If it helps your work, please consider sponsoring it. Your support keeps development going.
+Pangular Inspector is free and open source. If it helps your work, please consider sponsoring it. Your support keeps development going.
 
 <p>
-  <a href="https://github.com/sponsors/santoshyadavdev"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white" alt="Sponsor Angular DevTools on GitHub" /></a>
+  <a href="https://github.com/sponsors/santoshyadavdev"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white" alt="Sponsor Pangular Inspector on GitHub" /></a>
 </p>
 
 ### Company sponsors

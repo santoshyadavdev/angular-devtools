@@ -17,7 +17,7 @@ There are two ways to connect. Pick one based on the data your agent needs.
 
 <ngmd-card-grid columns="2">
   <ngmd-card icon="terminal" title="stdio" cta="Source only">
-    Your client starts <code>ng-devtools mcp</code> for your project folder. The server scans your source. No page ever connects to it.
+    Your client starts <code>pangular mcp</code> for your project folder. The server scans your source. No page ever connects to it.
   </ngmd-card>
   <ngmd-card icon="zap" title="HTTP" cta="Source and live page">
     Your client calls <code>/__devframes/__mcp</code> on the server that runs your app. Pages open in a browser report to it, so the live tools work.
@@ -26,17 +26,17 @@ There are two ways to connect. Pick one based on the data your agent needs.
 
 | Transport                   | Live page data                       | Setup                                |
 | --------------------------- | ------------------------------------ | ------------------------------------ |
-| stdio (`ng-devtools mcp`)   | No. Source scan tools only.          | A command in your MCP client config. |
+| stdio (`pangular mcp`)      | No. Source scan tools only.          | A command in your MCP client config. |
 | HTTP (`/__devframes/__mcp`) | Yes, with the app open in a browser. | A URL on your app's dev server.      |
 
 ## Connect over stdio
 
-The package ships an `ng-devtools` binary. Its `mcp` command starts an MCP server on stdin and stdout.
+The package ships a `pangular` binary. Its `mcp` command starts an MCP server on stdin and stdout.
 
 ### Add the stdio server to your client
 
 ```bash group="stdio" name="Claude Code" active
-claude mcp add ng-devtools -- npx @santoshyadavdev/ng-devtools mcp --root /path/to/your-app
+claude mcp add ng-devtools -- npx @pangular-inspector/core mcp --root /path/to/your-app
 ```
 
 ```json group="stdio" name="Cursor"
@@ -45,7 +45,7 @@ claude mcp add ng-devtools -- npx @santoshyadavdev/ng-devtools mcp --root /path/
   "mcpServers": {
     "ng-devtools": {
       "command": "npx",
-      "args": ["@santoshyadavdev/ng-devtools", "mcp", "--root", "${workspaceFolder}"]
+      "args": ["@pangular-inspector/core", "mcp", "--root", "${workspaceFolder}"]
     }
   }
 }
@@ -58,7 +58,7 @@ claude mcp add ng-devtools -- npx @santoshyadavdev/ng-devtools mcp --root /path/
     "ng-devtools": {
       "type": "stdio",
       "command": "npx",
-      "args": ["@santoshyadavdev/ng-devtools", "mcp", "--root", "${workspaceFolder}"]
+      "args": ["@pangular-inspector/core", "mcp", "--root", "${workspaceFolder}"]
     }
   }
 }
@@ -190,7 +190,7 @@ The live tools read what the page reports. Without an open page, they have nothi
 
 <ngmd-workflow>
   <ngmd-step title="Start your app">
-    Run the server that mounts the devtools: your Express SSR server, the Vite dev server, or <code>ng-devtools dev</code>.
+    Run the server that mounts the devtools: your Express SSR server, the Vite dev server, or <code>pangular dev</code>.
   </ngmd-step>
   <ngmd-step title="Open it in a browser">
     Load the app with the <a href="../getting-started/overlay.md">overlay</a>. The page connects to the devtools and starts reporting.

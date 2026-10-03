@@ -130,8 +130,8 @@ const PHASE_COLORS: Record<string, string> = {
                 @if (nav.beforeConnect) {
                   <span class="muted">{{
                     nav.endedAt === undefined && nav.outcome !== 'pending'
-                      ? 'before DevTools connected'
-                      : 'started before DevTools connected'
+                      ? 'before Pangular Inspector connected'
+                      : 'started before Pangular Inspector connected'
                   }}</span>
                 } @else if (nav.phases?.['total'] !== undefined) {
                   <span class="muted ms">{{ nav.phases?.['total'] }}ms</span>
@@ -269,7 +269,7 @@ const PHASE_COLORS: Record<string, string> = {
               }
               @if (nav.earlier) {
                 <dt>Earlier</dt>
-                <dd>{{ nav.earlier }} navigation(s) before DevTools connected</dd>
+                <dd>{{ nav.earlier }} navigation(s) before Pangular Inspector connected</dd>
               }
             </dl>
             <div class="actions">
@@ -313,7 +313,7 @@ const PHASE_COLORS: Record<string, string> = {
         </div>
       } @else {
         <div class="empty">
-          <p class="empty-title">No navigations since DevTools connected.</p>
+          <p class="empty-title">No navigations since Pangular Inspector connected.</p>
           <p class="muted">Earlier ones are not visible. Click a link in the app to record one.</p>
         </div>
       }

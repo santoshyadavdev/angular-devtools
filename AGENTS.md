@@ -2,7 +2,7 @@ Follow the Angular, TypeScript and accessibility rules in `.claude/rules/angular
 
 ## This repository
 
-Angular DevTools inspects a running Angular app and serves what it finds to a panel and to AI agents over MCP. It is an Nx and pnpm workspace:
+Pangular Inspector inspects a running Angular app and serves what it finds to a panel and to AI agents over MCP. It is an Nx and pnpm workspace:
 
 | Path                        | What it is                                                                                                                                                     |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |

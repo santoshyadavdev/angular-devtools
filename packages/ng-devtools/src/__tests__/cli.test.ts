@@ -17,7 +17,7 @@ afterEach(() => {
   process.exitCode = undefined;
 });
 
-describe('ng-devtools build --outDir', () => {
+describe('pangular build --outDir', () => {
   it('refuses the working directory and its parents, even with --force', () => {
     const cwd = project();
     for (const outDir of ['.', '..', cwd, join(cwd, '..')]) {
@@ -75,7 +75,7 @@ describe('ng-devtools build --outDir', () => {
     const run = (outDir: string, ...extra: string[]) =>
       createCac(definition as never, { configureCli: guardReportOutDir }).parse([
         'node',
-        'ng-devtools',
+        'pangular',
         'build',
         '--outDir',
         outDir,
@@ -107,7 +107,7 @@ describe('ng-devtools build --outDir', () => {
     try {
       await createNgDevtoolsCli({ log: () => {} }).parse([
         'node',
-        'ng-devtools',
+        'pangular',
         'build',
         '--root',
         root,
@@ -124,7 +124,7 @@ describe('ng-devtools build --outDir', () => {
   });
 });
 
-describe('ng-devtools dev startup', () => {
+describe('pangular dev startup', () => {
   it('prints the Angular Native view next to the panel URL', () => {
     for (const origin of ['http://localhost:9999', 'http://localhost:9999/']) {
       const lines = startupLines(origin, 9999, { mcp: true });

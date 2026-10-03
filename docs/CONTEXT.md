@@ -1,6 +1,6 @@
-# Angular DevTools
+# Pangular Inspector
 
-Angular DevTools inspects a running Angular app and serves what it finds to a panel and to AI agents over MCP. This glossary fixes the words the project uses for its own concepts, so that a name means one thing in the code, the docs, issues and commit messages. Each entry gives the term, what it means here, and the words to avoid for it.
+Pangular Inspector inspects a running Angular app and serves what it finds to a panel and to AI agents over MCP. This glossary fixes the words the project uses for its own concepts, so that a name means one thing in the code, the docs, issues and commit messages. Each entry gives the term, what it means here, and the words to avoid for it.
 
 ## Language
 
@@ -17,7 +17,7 @@ The short id a page claims when the overlay starts, kept in `sessionStorage` so 
 _Avoid_: tab id, session id, client id
 
 **Overlay**:
-The script the app imports in `main.ts` in development only (`@santoshyadavdev/ng-devtools/overlay`). It finds the server, starts the collectors and adds the floating button. It reads the page; it never changes it on its own.
+The script the app imports in `main.ts` in development only (`@pangular-inspector/core/overlay`). It finds the server, starts the collectors and adds the floating button. It reads the page; it never changes it on its own.
 _Avoid_: content script, agent, injected script
 
 **Collector**:
@@ -81,7 +81,7 @@ What the devtools read from the project's source files rather than the running p
 _Avoid_: static analysis, AST pass, crawl
 
 **Static report**:
-An offline HTML build of the panel over the source scan, written by `ng-devtools build --outDir <dir>`. No page connects to it.
+An offline HTML build of the panel over the source scan, written by `pangular build --outDir <dir>`. No page connects to it.
 _Avoid_: export, snapshot, static site
 
 **Redaction**:

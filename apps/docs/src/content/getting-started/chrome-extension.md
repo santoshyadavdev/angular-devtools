@@ -4,12 +4,12 @@ description: Open the devtools as a panel inside Chrome DevTools.
 ---
 
 <ngmd-hero title="Chrome extension" logo="https://cdn.simpleicons.org/googlechrome/4285F4" gradient>
-  An Angular DevTools panel inside Chrome DevTools. It loads the devtools UI and connects it to the dev server of the page you inspect.
+  A Pangular Inspector panel inside Chrome DevTools. It loads the devtools UI and connects it to the dev server of the page you inspect.
 </ngmd-hero>
 
 # Chrome extension
 
-The Chrome extension adds a panel named **Angular DevTools** to Chrome DevTools. The panel loads the devtools UI and connects it to the dev server of the page you are inspecting.
+The Chrome extension adds a panel named **Pangular Inspector** to Chrome DevTools. The panel loads the devtools UI and connects it to the dev server of the page you are inspecting.
 
 <ngmd-callout type="info" title="An extra, not a setup">
   The page still needs the devtools mounted on its server and the <a href="./overlay.md">overlay</a> loaded. The extension is one more way to open the devtools. It does not replace the setup. Start with <a href="./express.md">Angular CLI and Express</a> or <a href="./vite.md">Vite and Analog</a>.
@@ -47,7 +47,7 @@ The Chrome extension adds a panel named **Angular DevTools** to Chrome DevTools.
     Click <strong>Load unpacked</strong> and select the <code>extension/</code> directory.
   </ngmd-step>
   <ngmd-step title="Open DevTools on an Angular app">
-    The <strong>Angular DevTools</strong> panel appears next to the built-in panels.
+    The <strong>Pangular Inspector</strong> panel appears next to the built-in panels.
   </ngmd-step>
 </ngmd-workflow>
 

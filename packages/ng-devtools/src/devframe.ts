@@ -183,7 +183,7 @@ type SetupInfo = DevframeSetupInfo & { config?: ResolvedNgDevtoolsConfig; pageTo
 
 const ngDevtools = defineDevframe({
   id: 'ng-devtools',
-  name: 'Angular DevTools',
+  name: 'Pangular Inspector',
   version: pkg.version,
   packageName: pkg.name,
   description: 'Inspect Angular component trees, signals, and routes at dev and build time.',

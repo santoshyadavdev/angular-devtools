@@ -173,9 +173,9 @@ export function createDevtoolsPopup(options: { src?: string } = {}) {
 
   // FAB toggle button
   const fab = document.createElement('button');
-  fab.setAttribute('aria-label', 'Toggle Angular DevTools');
+  fab.setAttribute('aria-label', 'Toggle Pangular Inspector');
   fab.setAttribute('aria-expanded', 'false');
-  fab.title = 'Angular DevTools';
+  fab.title = 'Pangular Inspector';
   // The Angular shield, from the wordmark on angular.dev.
   fab.innerHTML =
     `<svg width="22" height="22" viewBox="0 0 223 236" fill="currentColor" aria-hidden="true">` +
@@ -187,7 +187,7 @@ export function createDevtoolsPopup(options: { src?: string } = {}) {
   const panel = document.createElement('div');
   panel.classList.add('panel');
   panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-label', 'Angular DevTools');
+  panel.setAttribute('aria-label', 'Pangular Inspector');
 
   // Toolbar
   const toolbar = document.createElement('div');
@@ -227,7 +227,7 @@ export function createDevtoolsPopup(options: { src?: string } = {}) {
   closeBtn.classList.add('close-btn');
   closeBtn.innerHTML = '✕';
   closeBtn.title = 'Close';
-  closeBtn.setAttribute('aria-label', 'Close Angular DevTools');
+  closeBtn.setAttribute('aria-label', 'Close Pangular Inspector');
   closeBtn.addEventListener('click', togglePanel);
 
   toolbar.title = 'Drag to move. Double click to reset the position.';
@@ -236,7 +236,7 @@ export function createDevtoolsPopup(options: { src?: string } = {}) {
   // Iframe
   const iframe = document.createElement('iframe');
   iframe.classList.add('frame');
-  iframe.title = 'Angular DevTools';
+  iframe.title = 'Pangular Inspector';
 
   const missingStatus = document.createElement('span');
   missingStatus.classList.add('sr-only');

@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import analog from '@analogjs/platform';
-import ngDevtools from '@santoshyadavdev/ng-devtools/vite';
+import ngDevtools from '@pangular-inspector/core/vite';
 
 export default defineConfig(() => ({
   build: {
@@ -10,10 +10,10 @@ export default defineConfig(() => ({
   resolve: {
     mainFields: ['module'],
     alias: {
-      '@santoshyadavdev/ng-devtools/overlay': fileURLToPath(
+      '@pangular-inspector/core/overlay': fileURLToPath(
         new URL('../../packages/ng-devtools/dist/overlay.mjs', import.meta.url),
       ),
-      '@santoshyadavdev/ng-devtools/http': fileURLToPath(
+      '@pangular-inspector/core/http': fileURLToPath(
         new URL('../../packages/ng-devtools/dist/http.mjs', import.meta.url),
       ),
     },

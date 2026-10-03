@@ -9,7 +9,7 @@ description: Run the devtools from the command line, build a static report, or s
 
 # Standalone CLI
 
-The package installs an `ng-devtools` binary. Run it from the root of your Angular workspace, or point it there with `--root`. It scans the source files in that folder, so it works without starting your app.
+The package installs a `pangular` binary. Run it from the root of your Angular workspace, or point it there with `--root`. It scans the source files in that folder, so it works without starting your app.
 
 ## Commands
 
@@ -19,7 +19,7 @@ The package installs an `ng-devtools` binary. Run it from the root of your Angul
 | `build` | Writes a static copy of the devtools with the scan. |
 | `mcp`   | Starts an MCP server over stdio for coding agents.  |
 
-`ng-devtools --version` prints the package version. An unknown command or flag prints one error line and exits with code 1. `ng-devtools --help` lists the commands and flags.
+`pangular --version` prints the package version. An unknown command or flag prints one error line and exits with code 1. `pangular --help` lists the commands and flags.
 
 ### Flags for every command
 
@@ -49,19 +49,19 @@ A missing `--config` file or invalid JSON stops the command with an error.
 ### Run it without installing
 
 ```bash group="run" name="npx" image="https://cdn.simpleicons.org/npm/CB3837" active
-npx @santoshyadavdev/ng-devtools dev
+npx @pangular-inspector/core dev
 ```
 
 ```bash group="run" name="pnpm" image="https://cdn.simpleicons.org/pnpm/F69220"
-pnpm dlx @santoshyadavdev/ng-devtools dev
+pnpm dlx @pangular-inspector/core dev
 ```
 
 ```bash group="run" name="yarn" image="https://cdn.simpleicons.org/yarn/2C8EBB"
-yarn dlx @santoshyadavdev/ng-devtools dev
+yarn dlx @pangular-inspector/core dev
 ```
 
 ```bash group="run" name="bun" image="https://bun.sh/logo.svg"
-bunx @santoshyadavdev/ng-devtools dev
+bunx @pangular-inspector/core dev
 ```
 
 ### Run the installed binary
@@ -69,25 +69,25 @@ bunx @santoshyadavdev/ng-devtools dev
 With the package installed in your project, call the binary through your package manager:
 
 ```bash
-npx ng-devtools dev
-npx ng-devtools build --outDir dist-report
-npx ng-devtools mcp
+npx pangular dev
+npx pangular build --outDir dist-report
+npx pangular mcp
 ```
 
 ## Dev server
 
 ### Start it
 
-The default command starts a local server with the devtools UI. `dev` is optional: `npx @santoshyadavdev/ng-devtools` does the same.
+The default command starts a local server with the devtools UI. `dev` is optional: `npx @pangular-inspector/core` does the same.
 
 ```bash
-npx @santoshyadavdev/ng-devtools dev --port 9999 --open
+npx @pangular-inspector/core dev --port 9999 --open
 ```
 
 When the server is ready, it prints the version, the panel URL, the panel URL for [Angular Native](./angular-native.md) apps and the MCP endpoint:
 
 ```text
-  ng-devtools v0.0.6
+  pangular v0.0.6
   Panel: http://localhost:9999/
   Angular Native apps: http://localhost:9999/?view=angular-native
   MCP:   http://localhost:9999/__mcp
@@ -131,7 +131,7 @@ When no app is connected, the tabs show what your source declares. An [Angular N
 `build` writes a self-contained static copy of the devtools with the source scan baked in: components, routes, signals, providers, pipes, NgRx declarations and build metadata.
 
 ```bash
-npx @santoshyadavdev/ng-devtools build --outDir dist-report
+npx @pangular-inspector/core build --outDir dist-report
 ```
 
 ### Report flags
@@ -160,7 +160,7 @@ The output is static files. Open it offline or host it on any static file server
 `mcp` starts an *MCP server over stdio for coding agents:
 
 ```bash
-npx @santoshyadavdev/ng-devtools mcp
+npx @pangular-inspector/core mcp
 ```
 
 Your agent client runs this command for you. [MCP server](../agents/mcp-server.md) covers client setup.

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@santoshyadavdev/ng-devtools` are listed here. The format follows [Keep a Changelog](https://keepachangelog.com).
+All notable changes to `@pangular-inspector/core` are listed here. The format follows [Keep a Changelog](https://keepachangelog.com).
 
 ## 0.0.6
 

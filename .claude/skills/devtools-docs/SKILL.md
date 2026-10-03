@@ -1,9 +1,9 @@
 ---
 name: devtools-docs
-description: Writing guide for the Angular DevTools documentation site in apps/docs (NgMd). Covers audience, voice, style rules, page types and structure, NgMd authoring components, code samples, checking claims against the code, and the build checks. You MUST use this skill any time you create, edit or review files in apps/docs/src/content, the docs home page, or README.md.
+description: Writing guide for the Pangular Inspector documentation site in apps/docs (NgMd). Covers audience, voice, style rules, page types and structure, NgMd authoring components, code samples, checking claims against the code, and the build checks. You MUST use this skill any time you create, edit or review files in apps/docs/src/content, the docs home page, or README.md.
 ---
 
-# Angular DevTools docs writing guide
+# Pangular Inspector docs writing guide
 
 The human-readable version of this guide is `apps/docs/src/content/contributing/writing-docs.md`. Keep the two in sync when rules change.
 

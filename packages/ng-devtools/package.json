@@ -1,7 +1,7 @@
 {
-  "name": "@santoshyadavdev/ng-devtools",
+  "name": "@pangular-inspector/core",
   "version": "0.0.6",
-  "description": "Angular DevTools \u2014 inspect components, signals, DI, and routes. Runs standalone, embedded, or over MCP.",
+  "description": "Pangular Inspector, the unified Angular devtools. Inspect components, signals, DI, and routes. Runs standalone, embedded, or over MCP.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -11,7 +11,7 @@
   "homepage": "https://github.com/santoshyadavdev/angular-devtools#readme",
   "type": "module",
   "bin": {
-    "ng-devtools": "./bin.mjs"
+    "pangular": "./bin.mjs"
   },
   "exports": {
     ".": "./src/devframe.ts",

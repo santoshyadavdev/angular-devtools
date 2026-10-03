@@ -1,4 +1,4 @@
-# Contributing to Angular DevTools
+# Contributing to Pangular Inspector
 
 Thanks for your interest in contributing. This guide covers the rules a change follows and how to get it merged. For setup, the project structure, the commands and what CI runs, see [Development setup](./apps/docs/src/content/contributing/development.md) on the docs site.
 

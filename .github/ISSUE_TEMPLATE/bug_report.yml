@@ -38,7 +38,7 @@ body:
         - Angular CLI with Express (initNgDevtoolsHub)
         - Vite plugin
         - Analog
-        - Standalone CLI (ng-devtools dev)
+        - Standalone CLI (pangular dev)
         - Chrome extension
         - MCP server (stdio or HTTP)
         - Other
@@ -62,7 +62,7 @@ body:
     id: versions
     attributes:
       label: Versions
-      description: Angular, @santoshyadavdev/ng-devtools, browser, and Analog if used.
+      description: Angular, @pangular-inspector/core, browser, and Analog if used.
   - type: textarea
     id: extra
     attributes:

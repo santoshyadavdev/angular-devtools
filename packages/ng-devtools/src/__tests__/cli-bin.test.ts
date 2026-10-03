@@ -81,11 +81,11 @@ async function mcp(args: string[], cwd: string) {
   return { ...result, tools: tools.map((tool) => tool.name.replace(/^ng-devtools_/, '')), meta };
 }
 
-describe('ng-devtools binary', () => {
+describe('pangular binary', () => {
   it('prints the package version', async () => {
     const { stdout, code } = await run(['--version']);
     expect(code).toBe(0);
-    expect(stdout).toContain(`ng-devtools/${pkg.version}`);
+    expect(stdout).toContain(`pangular/${pkg.version}`);
     expect((await run(['--help'])).stdout).toMatch(/\n\s+dev\s+Start a local dev server/);
   });
 
@@ -93,7 +93,7 @@ describe('ng-devtools binary', () => {
     const { stdout } = await run(['dev', '--no-open', '--port', '0'], {
       until: (out) => out.includes('MCP:'),
     });
-    expect(stdout).toContain(`ng-devtools v${pkg.version}`);
+    expect(stdout).toContain(`pangular v${pkg.version}`);
     expect(stdout).toMatch(/Panel: http:\/\/localhost:\d+\//);
     expect(stdout).toMatch(/Angular Native apps: http:\/\/localhost:\d+\/\?view=angular-native/);
     expect(stdout).toMatch(/MCP: {3}http:\/\/localhost:\d+\/__mcp/);

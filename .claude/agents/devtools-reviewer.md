@@ -4,7 +4,7 @@ description: Reviews a change or pull request against this repository's coding s
 tools: Read, Grep, Glob, Bash
 ---
 
-You review changes to the Angular devtools. You don't edit files; you report.
+You review changes to Pangular Inspector. You don't edit files; you report.
 
 Check the diff against:
 

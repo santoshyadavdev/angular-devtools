@@ -28,7 +28,7 @@ Most apps never call the popup API. To add the button without the overlay, call 
 
 ```ts
 // src/main.ts
-import {createDevtoolsPopup} from '@santoshyadavdev/ng-devtools/popup';
+import {createDevtoolsPopup} from '@pangular-inspector/core/popup';
 
 createDevtoolsPopup();
 ```
@@ -39,7 +39,7 @@ To open a fixed page instead, pass `src`:
 
 ```ts
 // src/main.ts
-import {createDevtoolsPopup} from '@santoshyadavdev/ng-devtools/popup';
+import {createDevtoolsPopup} from '@pangular-inspector/core/popup';
 
 createDevtoolsPopup({src: '/__my-devtools/'});
 ```

@@ -108,9 +108,9 @@ const NATIVESCRIPT_SETUP: ComingSoonInfo = {
   color: '#3c5afd',
   plansTitle: 'Set up an app',
   plans: [
-    'Install @santoshyadavdev/ng-devtools and @valor/nativescript-websockets',
+    'Install @pangular-inspector/core and @valor/nativescript-websockets',
     'Call initNativeScriptOverlay() in main.ts, before the app bootstraps',
-    'Run ng-devtools dev --no-auth in the app, then open the Angular dock',
+    'Run pangular dev --no-auth in the app, then open the Angular dock',
   ],
   link: {
     label: 'NativeScript setup guide',
@@ -719,7 +719,7 @@ export class App implements OnInit, OnDestroy {
   });
   readonly title = computed(() => {
     const view = this.view();
-    return view ? VIEW_TITLE[view] : 'Angular DevTools';
+    return view ? VIEW_TITLE[view] : 'Pangular Inspector';
   });
   readonly analogKnown = signal(false);
   readonly nativePageId = signal<string | null>(null);

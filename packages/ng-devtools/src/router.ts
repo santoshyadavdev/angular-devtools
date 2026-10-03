@@ -745,7 +745,7 @@ function timestamp(nav: NavigationRecord) {
       stateOf(nav).startedPerf,
       now(),
       'Router',
-      'Angular DevTools',
+      'Pangular Inspector',
       nav.outcome === 'succeeded' ? 'primary' : 'error',
     );
     return true;

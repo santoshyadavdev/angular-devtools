@@ -576,7 +576,7 @@ function bare(name: string): string {
           <p class="state-title">Could not load components</p>
           <p class="state-hint">
             @if (staticReport()) {
-              Run <code>ng-devtools build</code> again to rebuild the report.
+              Run <code>pangular build</code> again to rebuild the report.
             } @else {
               Check that the dev server is running, then try again.
             }

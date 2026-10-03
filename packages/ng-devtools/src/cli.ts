@@ -165,7 +165,7 @@ export function startupLines(
   const base = origin.replace(/\/$/, '');
   const panel = `${base}/`;
   const lines = [
-    `  ng-devtools v${pkg.version}`,
+    `  pangular v${pkg.version}`,
     `  Panel: ${panel}`,
     `  Angular Native apps: ${panel}?view=angular-native`,
   ];
@@ -182,7 +182,7 @@ export interface NgDevtoolsCliOptions {
 }
 
 /**
- * The `ng-devtools` command line: `dev` (the default), `build` and `mcp`, with
+ * The `pangular` command line: `dev` (the default), `build` and `mcp`, with
  * `--root`, `--config` and `--read-only` on each.
  */
 export function createNgDevtoolsCli(options: NgDevtoolsCliOptions = {}) {
@@ -193,6 +193,7 @@ export function createNgDevtoolsCli(options: NgDevtoolsCliOptions = {}) {
   let mcpOn = true;
   const definition = defineDevframe({
     ...ngDevtools,
+    cli: { ...ngDevtools.cli, command: 'pangular' },
     setup: (ctx, info) => current.setup(ctx, info),
   });
 
@@ -227,7 +228,7 @@ export function createNgDevtoolsCli(options: NgDevtoolsCliOptions = {}) {
       defaultCommand.action(async (args: string[], flags: NgDevtoolsCliFlags) => {
         if (args.length) {
           throw new Error(
-            `[ng-devtools] Unknown command "${args[0]}". Run ng-devtools --help to list the commands.`,
+            `[ng-devtools] Unknown command "${args[0]}". Run pangular --help to list the commands.`,
           );
         }
         await run(flags);
@@ -265,7 +266,7 @@ export function createNgDevtoolsCli(options: NgDevtoolsCliOptions = {}) {
         console.error(
           message.startsWith('[ng-devtools]')
             ? message
-            : `[ng-devtools] ${message}. Run ng-devtools --help for the commands and flags.`,
+            : `[ng-devtools] ${message}. Run pangular --help for the commands and flags.`,
         );
         process.exitCode = 1;
       }

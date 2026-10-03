@@ -9,24 +9,24 @@ description: Bump the version, build, and publish the npm package. Ship the Chro
 
 # Publishing
 
-The devtools ship as one npm package, `@santoshyadavdev/ng-devtools`, from `packages/ng-devtools`. It holds the Node-side logic, RPC, CLI, overlay, popup, and the built UI in `dist/public`.
+The devtools ship as one npm package, `@pangular-inspector/core`, from `packages/ng-devtools`. It holds the Node-side logic, RPC, CLI, overlay, popup, and the built UI in `dist/public`.
 
 ## What ships
 
 The package publishes `dist/` and `bin.mjs`. On publish, `publishConfig.exports` points every entry point at the built files:
 
-| Import                                  | Published file      |
-| --------------------------------------- | ------------------- |
-| `@santoshyadavdev/ng-devtools`          | `dist/devframe.mjs` |
-| `@santoshyadavdev/ng-devtools/devframe` | `dist/devframe.mjs` |
-| `@santoshyadavdev/ng-devtools/config`   | `dist/config.mjs`   |
-| `@santoshyadavdev/ng-devtools/overlay`  | `dist/overlay.mjs`  |
-| `@santoshyadavdev/ng-devtools/popup`    | `dist/popup.mjs`    |
-| `@santoshyadavdev/ng-devtools/http`     | `dist/http.mjs`     |
-| `@santoshyadavdev/ng-devtools/hub`      | `dist/hub.mjs`      |
-| `@santoshyadavdev/ng-devtools/vite`     | `dist/vite.mjs`     |
+| Import                              | Published file      |
+| ----------------------------------- | ------------------- |
+| `@pangular-inspector/core`          | `dist/devframe.mjs` |
+| `@pangular-inspector/core/devframe` | `dist/devframe.mjs` |
+| `@pangular-inspector/core/config`   | `dist/config.mjs`   |
+| `@pangular-inspector/core/overlay`  | `dist/overlay.mjs`  |
+| `@pangular-inspector/core/popup`    | `dist/popup.mjs`    |
+| `@pangular-inspector/core/http`     | `dist/http.mjs`     |
+| `@pangular-inspector/core/hub`      | `dist/hub.mjs`      |
+| `@pangular-inspector/core/vite`     | `dist/vite.mjs`     |
 
-The `ng-devtools` binary is `bin.mjs`. In the workspace, the exports point at the TypeScript sources instead.
+The `pangular` binary is `bin.mjs`. In the workspace, the exports point at the TypeScript sources instead.
 
 ### How the package builds
 
@@ -67,7 +67,7 @@ If `app/` changed since the last release, run `pnpm extension:build` and commit 
 pnpm devtools:publish
 ```
 
-This runs `pnpm --filter @santoshyadavdev/ng-devtools publish --access public`. The `prepack` build bundles the library and the UI.
+This runs `pnpm --filter @pangular-inspector/core publish --access public`. The `prepack` build bundles the library and the UI.
 
 <ngmd-alert severity="important">
   <code>pnpm publish</code> checks git before it publishes. Run it from a clean working tree on <code>main</code>.

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { defineConfig } from 'vite';
 import angular from '@analogjs/vite-plugin-angular';
 import { devframeViteBridge } from '@devframes/vite/single';
-import ngDevtools from '@santoshyadavdev/ng-devtools/devframe';
+import ngDevtools from '@pangular-inspector/core/devframe';
 
 export default defineConfig({
   base: './',

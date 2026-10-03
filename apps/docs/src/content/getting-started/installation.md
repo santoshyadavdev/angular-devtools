@@ -9,7 +9,7 @@ description: Install the devtools package and choose where it runs.
 
 # Installation
 
-The devtools ship as one npm package, `@santoshyadavdev/ng-devtools`. It contains the Node side, the browser overlay, the in-page popup, the CLI and the built UI.
+The devtools ship as one npm package, `@pangular-inspector/core`. It contains the Node side, the browser overlay, the in-page popup, the CLI and the built UI.
 
 ## Prerequisites
 
@@ -32,39 +32,39 @@ The devtools ship as one npm package, `@santoshyadavdev/ng-devtools`. It contain
 ## Install the package
 
 ```bash group="install" name="pnpm" image="https://cdn.simpleicons.org/pnpm/F69220" active
-pnpm add @santoshyadavdev/ng-devtools devframe
+pnpm add @pangular-inspector/core devframe
 ```
 
 ```bash group="install" name="npm" image="https://cdn.simpleicons.org/npm/CB3837"
-npm install @santoshyadavdev/ng-devtools devframe
+npm install @pangular-inspector/core devframe
 ```
 
 ```bash group="install" name="yarn" image="https://cdn.simpleicons.org/yarn/2C8EBB"
-yarn add @santoshyadavdev/ng-devtools devframe
+yarn add @pangular-inspector/core devframe
 ```
 
 ```bash group="install" name="bun" image="https://bun.sh/logo.svg"
-bun add @santoshyadavdev/ng-devtools devframe
+bun add @pangular-inspector/core devframe
 ```
 
 MCP agent support (`@devframes/agentic`) is included. You don't install it separately.
 
 ### Entry points
 
-| Import                                                | Use it for                                                                             |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `@santoshyadavdev/ng-devtools/hub`                    | `initNgDevtoolsHub()`, the server middleware for an Express app.                       |
-| `@santoshyadavdev/ng-devtools/vite`                   | The Vite plugin for Analog apps.                                                       |
-| `@santoshyadavdev/ng-devtools/overlay`                | The browser script that collects live data from your page.                             |
-| `@santoshyadavdev/ng-devtools/overlay-angular-native` | The overlay for an Angular Native app. See [Angular Native](./angular-native.md).      |
-| `@santoshyadavdev/ng-devtools/popup`                  | The floating button and panel on your page.                                            |
-| `@santoshyadavdev/ng-devtools/http`                   | The HTTP interceptor and hydration hooks for the SSR & HTTP tab.                       |
-| `@santoshyadavdev/ng-devtools/config`                 | The `NgDevtoolsConfig` type and its defaults. See [Configuration](./configuration.md). |
-| `@santoshyadavdev/ng-devtools/devframe`               | The devframe definition, for custom hosts.                                             |
+| Import                                            | Use it for                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `@pangular-inspector/core/hub`                    | `initNgDevtoolsHub()`, the server middleware for an Express app.                       |
+| `@pangular-inspector/core/vite`                   | The Vite plugin for Analog apps.                                                       |
+| `@pangular-inspector/core/overlay`                | The browser script that collects live data from your page.                             |
+| `@pangular-inspector/core/overlay-angular-native` | The overlay for an Angular Native app. See [Angular Native](./angular-native.md).      |
+| `@pangular-inspector/core/popup`                  | The floating button and panel on your page.                                            |
+| `@pangular-inspector/core/http`                   | The HTTP interceptor and hydration hooks for the SSR & HTTP tab.                       |
+| `@pangular-inspector/core/config`                 | The `NgDevtoolsConfig` type and its defaults. See [Configuration](./configuration.md). |
+| `@pangular-inspector/core/devframe`               | The devframe definition, for custom hosts.                                             |
 
 ### The CLI binary
 
-The package also installs an `ng-devtools` binary. It runs the devtools without your app: a local server, a static report or an MCP server. See [Standalone CLI](./cli.md).
+The package also installs a `pangular` binary. It runs the devtools without your app: a local server, a static report or an MCP server. See [Standalone CLI](./cli.md).
 
 ## Pick a setup
 
@@ -80,7 +80,7 @@ Pick the tab that matches your app:
 ```ts group="setup" name="Angular CLI + Express" image="https://cdn.simpleicons.org/express/71717A" active
 // src/server.ts
 import express from 'express';
-import {initNgDevtoolsHub} from '@santoshyadavdev/ng-devtools/hub';
+import {initNgDevtoolsHub} from '@pangular-inspector/core/hub';
 
 const app = express();
 const devtools = initNgDevtoolsHub({ws: false});
@@ -90,7 +90,7 @@ app.use(devtools.nodeMiddleware);
 ```ts group="setup" name="Analog (Vite)" image="https://cdn.simpleicons.org/vite/646CFF"
 // vite.config.ts
 import analog from '@analogjs/platform';
-import ngDevtools from '@santoshyadavdev/ng-devtools/vite';
+import ngDevtools from '@pangular-inspector/core/vite';
 import {defineConfig} from 'vite';
 
 export default defineConfig({
@@ -100,7 +100,7 @@ export default defineConfig({
 
 ```bash group="setup" name="Standalone CLI" image="https://cdn.simpleicons.org/gnubash/4EAA25"
 # Run from the root of your Angular workspace
-npx @santoshyadavdev/ng-devtools
+npx @pangular-inspector/core
 ```
 
 ### Browser part
@@ -116,7 +116,7 @@ import {appConfig} from './app/app.config';
 bootstrapApplication(App, appConfig)
   .then(() => {
     if (typeof ngDevMode === 'undefined' || ngDevMode) {
-      return import('@santoshyadavdev/ng-devtools/overlay');
+      return import('@pangular-inspector/core/overlay');
     }
     return undefined;
   })
@@ -130,7 +130,7 @@ import {App} from './app/app';
 import {appConfig} from './app/app.config';
 
 bootstrapApplication(App, appConfig).then(() => {
-  if (import.meta.env.DEV) void import('@santoshyadavdev/ng-devtools/overlay');
+  if (import.meta.env.DEV) void import('@pangular-inspector/core/overlay');
 });
 ```
 

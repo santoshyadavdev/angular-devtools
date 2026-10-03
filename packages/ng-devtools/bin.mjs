@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { createNgDevtoolsCli } from '@santoshyadavdev/ng-devtools/cli';
+import { createNgDevtoolsCli } from '@pangular-inspector/core/cli';
 
 await createNgDevtoolsCli().parse();

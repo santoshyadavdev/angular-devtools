@@ -224,7 +224,7 @@ export const ngDevtoolsHttpInterceptor: HttpInterceptorFn = (req, next) => {
             () =>
               new HttpErrorResponse({
                 status,
-                statusText: 'Injected by Angular DevTools',
+                statusText: 'Injected by Pangular Inspector',
                 url,
                 error: body,
                 headers,
@@ -233,7 +233,7 @@ export const ngDevtoolsHttpInterceptor: HttpInterceptorFn = (req, next) => {
         : of(
             new HttpResponse({
               status,
-              statusText: 'Mocked by Angular DevTools',
+              statusText: 'Mocked by Pangular Inspector',
               url,
               body,
               headers,

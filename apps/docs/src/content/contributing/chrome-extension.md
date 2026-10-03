@@ -62,7 +62,7 @@ This builds the devtools UI (`pnpm devtools:build`), then replaces `extension/ui
     Click <strong>Load unpacked</strong> and select the <code>extension/</code> directory.
   </ngmd-step>
   <ngmd-step title="Open DevTools on an Angular app">
-    Start a demo app and open DevTools. The <strong>Angular DevTools</strong> panel appears once the extension detects Angular on the page.
+    Start a demo app and open DevTools. The <strong>Pangular Inspector</strong> panel appears once the extension detects Angular on the page.
   </ngmd-step>
 </ngmd-workflow>
 

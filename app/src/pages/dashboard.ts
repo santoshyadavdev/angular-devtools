@@ -12,7 +12,7 @@ import type { DevframeRpcClient } from 'devframe/client';
 import {
   summarizeNgDevtoolsConfig,
   type ResolvedNgDevtoolsConfig,
-} from '@santoshyadavdev/ng-devtools/config';
+} from '@pangular-inspector/core/config';
 import { hostPageId } from '../page-id';
 import { injectorTreeFor, signalGraphFor } from '../live-pages';
 import { isStaticReport } from '../rpc';
@@ -167,7 +167,7 @@ export function storeCard(rows: Row[]): Card {
         @if (metaState() === 'error') {
           <p class="hint">
             @if (staticReport()) {
-              Run <code>ng-devtools build</code> again to rebuild the report.
+              Run <code>pangular build</code> again to rebuild the report.
             } @else {
               Check that the dev server is running, then reload the panel.
             }

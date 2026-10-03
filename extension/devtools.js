@@ -36,5 +36,5 @@ function createPanel() {
   panelCreated = true;
   clearTimeout(pageCheck);
 
-  chrome.devtools.panels.create('Angular DevTools', 'icons/icon-128.png', 'panel.html');
+  chrome.devtools.panels.create('Pangular Inspector', 'icons/icon-128.png', 'panel.html');
 }

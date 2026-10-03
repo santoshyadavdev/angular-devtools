@@ -212,7 +212,7 @@ Aborting and probing use the `currentNavigation` signal and `Navigation.abort()`
 
 ### Navigations before the devtools connected
 
-The tab lists only the last one, marked **before DevTools connected**, without timing or guard details. It also lists a navigation still running at that moment.
+The tab lists only the last one, marked **before Pangular Inspector connected**, without timing or guard details. It also lists a navigation still running at that moment.
 
 ### Redaction
 

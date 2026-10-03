@@ -164,7 +164,7 @@ Always set the language. When the code belongs in a specific file, put the path 
 ```ts {6}
 // src/app/app.config.ts
 import {ApplicationConfig} from '@angular/core';
-import {provideNgDevtoolsHttp} from '@santoshyadavdev/ng-devtools/http';
+import {provideNgDevtoolsHttp} from '@pangular-inspector/core/http';
 
 export const appConfig: ApplicationConfig = {
   providers: [provideNgDevtoolsHttp()],
@@ -178,11 +178,11 @@ For install commands, use a code group so readers pick their package manager. Li
 
 ````md
 ```bash group="install" name="pnpm" active
-pnpm add @santoshyadavdev/ng-devtools devframe
+pnpm add @pangular-inspector/core devframe
 ```
 
 ```bash group="install" name="npm"
-npm install @santoshyadavdev/ng-devtools devframe
+npm install @pangular-inspector/core devframe
 ```
 ````
 
